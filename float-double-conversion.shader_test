@@ -1,0 +1,59 @@
+# Conversion from float to double 
+# IEEE 754 compliant
+
+[require]
+GLSL >= 1.30
+
+[vertex shader]
+#version 130
+void main()
+{
+   gl_Position = gl_Vertex;
+}
+
+[fragment shader]
+#version 130
+void main()
+{
+   gl_FragColor = gl_Color;
+}
+
+[test]
+
+#################################################
+#
+# Convert Float32 to Float64
+#
+#################################################
+
+uint extractFloat32Frac( in float a )
+{
+  return a & 0x007FFFFF;
+}
+
+uint extractFloat32Exp( in float a )
+{
+   return (a>>23) & 0xFF;
+}
+
+uint extractFloat32Sign( in float a )
+{
+   return a & 0x80000000;
+}
+
+uvec2 float32_to_float64( in float a )
+{
+   uint leftPart;
+   uint rightPart;
+   uint Frac;
+   uint Exp;
+   uint Sign;
+
+   Frac = extractFloat32( a );
+   Exp = extractFloat32Exp( a );
+   Sign = extractFloat32Sign( a );
+   
+   leftPart = Sign || (Exp<<19);
+   rightPart = Frac;
+   return uvec2( leftPart, rightPart ); 
+}
