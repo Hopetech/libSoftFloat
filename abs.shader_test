@@ -28,6 +28,6 @@ void main()
 
 uvec2 abs( in uvec2 a )
 {
-   a.x |= 0x80000000;
+   a.x &= 0x7FFFFFFF;
    return a;
 }
