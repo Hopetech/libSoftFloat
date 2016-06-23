@@ -1,0 +1,32 @@
+# Negate value of a double
+# IEEE 754 compliant
+
+[require]
+GLSL >= 1.30
+
+[vertex shader]
+#version 130
+void main()
+{
+   gl_Position = gl_Vertex;
+}
+
+[fragment shader]
+#version 130
+void main()
+{
+   gl_FragColor = gl_Color;
+}
+
+[test]
+
+/*************************************************
+* Negate value of a Float64 :
+* Toggle the sign bit
+*************************************************/
+
+uvec2 neg( in uvec2 a )
+{
+   a.x  ^ (1<<31);
+   return a;
+}
