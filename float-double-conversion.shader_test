@@ -20,60 +20,72 @@ void main()
 
 [test]
 
-/************************************************
-* Convert Float32 to Float64:
-* Extract Float32 Sign, Exp and Frac
-* Assign it to the Float64
-************************************************/
-
+/****************************************************************************
+* Packs the sign `aSign', exponent `aExp', and fraction `aFrac' into a
+* double-precision floating-point value, returning the result.  After being
+* shifted into the proper positions, the three fields are simply added
+* together to form the result.
+****************************************************************************/
 uvec2
-packFloat64( in uint Sign, in uint Exp, in uint Frac ) {
-   return uvec2( (Sign | ((Exp + 0x380) << 23) | (Frac >> 10) ), (Frac << 19) );
+packFloat64( in uint aSign, in uint aExp, in uint aFrac ) {
+   return uvec2( (aSign + ((aExp + 0x380) << 20) + (aFrac >> 3) ), (aFrac << 28) );
 }
 
+/****************************************************************************
+* Returns the fraction bits of the single-precision floating-point value `a'.
+****************************************************************************/
 uint
 extractFloat32Frac( in float a ) {
   return a & 0x007FFFFF;
 }
 
+/****************************************************************************
+* Returns the exponent bits of the single-precision floating-point value `a'.
+****************************************************************************/
 uint
 extractFloat32Exp( in float a ) {
    return (a>>23) & 0xFF;
 }
 
+/****************************************************************************
+* Returns the sign bit of the single-precision floating-point value `a'.
+****************************************************************************/
 uint
 extractFloat32Sign( in float a ) {
    return a & 0x80000000;
 }
 
+/****************************************************************************
+* Returns the result of converting the single-precision floating-point value
+* `a' to the double-precision floating-point format.
+****************************************************************************/
 uvec2
 float32_to_float64( in float a ) {
-   uint rightPart;
-   uint Frac;
-   uint Exp;
-   uint Sign;
+   uint aFrac;
+   uint aExp;
+   uint aSign;
 
-   Frac = extractFloat32Frac( a );
-   Exp = extractFloat32Exp( a );
-   Sign = extractFloat32Sign( a );
+   aFrac = extractFloat32Frac( a );
+   aExp = extractFloat32Exp( a );
+   aSign = extractFloat32Sign( a );
    
-   if(Exp == 0xFF) {
-      if( Frac ) {
+   if(aExp == 0xFF) {
+      if( aFrac ) {
          /* NaN */
-         return uvec2( (Sign | 0x7FF00000 | (Frac >> 10)), (Frac << 19) );
+         return uvec2( (aSign | 0x7FF00000 | (aFrac >> 3)), (aFrac << 28) );
       }
       /* Inf */
-      return uvec2( (Sign | 0x7FF00000), 0 );
+      return uvec2( (aSign | 0x7FF00000), 0 );
    }
 
-   if( Exp == 0 ) {
-      if( Frac ) {
+   if( aExp == 0 ) {
+      if( aFrac ) {
          /* Denormals */
-         return packFloat64(0, 0, Frac);
+         return uvec2(0,0);
       }
    /* Zero */
-   return packFloat64(Sign, 0, 0);
+   return packFloat64(aSign, 0, 0);
    }
 
-   return packFloat64(Sign, Exp, Frac);
+   return packFloat64(aSign, aExp, aFrac);
 }
