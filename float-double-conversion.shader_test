@@ -28,7 +28,7 @@ void main()
 
 uvec2
 packFloat64( in uint Sign, in uint Exp, in uint Frac ) {
-   return uvec2( (Sign | (Exp << 23) | (Frac >> 10) ), (Frac << 19) );
+   return uvec2( (Sign | ((Exp + 0x380) << 23) | (Frac >> 10) ), (Frac << 19) );
 }
 
 uint
