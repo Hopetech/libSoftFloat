@@ -5,53 +5,44 @@
 GLSL >= 1.30
 
 [vertex shader]
-#version 130
 void main()
 {
    gl_Position = gl_Vertex;
 }
 
 [fragment shader]
-#version 130
-void main()
-{
-   gl_FragColor = gl_Color;
-}
-
-[test]
-
 /****************************************************************************
 * Packs the sign `aSign', exponent `aExp', and fraction `aFrac' into a
 * double-precision floating-point value, returning the result.  After being
 * shifted into the proper positions, the three fields are simply added
 * together to form the result.
 ****************************************************************************/
-uvec2
-packFloat64( in uint aSign, in uint aExp, in uint aFrac ) {
-   return uvec2( (aSign + ((aExp + 0x380) << 20) + (aFrac >> 3) ), (aFrac << 28) );
+uvec2 packFloat64( uint aSign, uint aExp, uint aFrac )
+{
+   return uvec2((aSign + ((aExp + 0x380) << 20) + (aFrac >> 3)), (aFrac << 28));
 }
 
 /****************************************************************************
 * Returns the fraction bits of the single-precision floating-point value `a'.
 ****************************************************************************/
-uint
-extractFloat32Frac( in float a ) {
+uint extractFloat32Frac( uint a )
+{
   return a & 0x007FFFFF;
 }
 
 /****************************************************************************
 * Returns the exponent bits of the single-precision floating-point value `a'.
 ****************************************************************************/
-uint
-extractFloat32Exp( in float a ) {
+uint extractFloat32Exp( uint a )
+{
    return (a>>23) & 0xFF;
 }
 
 /****************************************************************************
 * Returns the sign bit of the single-precision floating-point value `a'.
 ****************************************************************************/
-uint
-extractFloat32Sign( in float a ) {
+uint extractFloat32Sign( uint a )
+{
    return a & 0x80000000;
 }
 
@@ -59,8 +50,8 @@ extractFloat32Sign( in float a ) {
 * Returns the result of converting the single-precision floating-point value
 * `a' to the double-precision floating-point format.
 ****************************************************************************/
-uvec2
-float32_to_float64( in float a ) {
+uvec2 fp32_to_fp64( uint a )
+{
    uint aFrac;
    uint aExp;
    uint aSign;
@@ -89,3 +80,46 @@ float32_to_float64( in float a ) {
 
    return packFloat64(aSign, aExp, aFrac);
 }
+
+uniform uint a;
+uniform uvec2 expected;
+
+void main()
+{
+    /* Generate green if the expected value is producted, red
+     * otherwise.
+     */
+    gl_FragColor = fp32_to_fp64(a) == expected
+        ? vec4(0.0, 1.0, 0.0, 1.0)
+        : vec4(1.0, 0.0, 0.0, 1.0);
+}
+
+[test]
+# A bunch of tests to run.  The 'uniform' lines set the uniforms.  The
+# 'draw rect' line draws a rectangle that covers the whole window.
+# The 'probe all' line verifies that every pixel contains the expected
+# color.
+
+# Try +0.0
+uniform uint a         0x00000000
+uniform uvec2 expected 0x00000000 0x00000000
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
+
+# Try -0.0
+uniform uint a         0x80000000
+uniform uvec2 expected 0x80000000 0x00000000
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
+
+# Try +Inf
+uniform uint a         0x7F800000
+uniform uvec2 expected 0x7FF00000 0x00000000
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
+
+# Try -Inf
+uniform uint a         0x7F800000
+uniform uvec2 expected 0x7FF00000 0x00000000
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0

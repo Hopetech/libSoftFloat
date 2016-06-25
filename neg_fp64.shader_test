@@ -1,0 +1,54 @@
+# Negate value of a double
+# IEEE 754 compliant
+
+[require]
+GLSL >= 1.30
+
+[vertex shader]
+void main()
+{
+   gl_Position = gl_Vertex;
+}
+
+[fragment shader]
+/*************************************************
+* Negate value of a Float64 :
+* Toggle the sign bit
+*************************************************/
+
+uvec2 neg_fp64(uvec2 a)
+{
+   a.x ^= (1<<31);
+   return a;
+}
+
+uniform uvec2 a;
+uniform uvec2 expected;
+
+void main()
+{
+   /* Generate green if the expected value is produced, red
+    * otherwise. 
+    */
+   gl_FragColor = neg_fp64(a) == expected
+      ? vec4(0.0, 1.0, 0.0, 1.0)
+      : vec4(1.0, 0.0, 0.0, 1.0);
+}
+
+[test]
+# A bunch of tests to run.  The 'uniform' lines set the uniforms.  The
+# 'draw rect' line draws a rectangle that covers the whole window.
+# The 'probe all' line verifies that every pixel contains the expected
+# color.
+
+# Try +0.0
+uniform uvec2 a        0x00000000 0x00000000
+uniform uvec2 expected 0x80000000 0x00000000
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
+
+# Try -0.0
+uniform uvec2 a        0x80000000 0x00000000
+uniform uvec2 expected 0x00000000 0x00000000
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
