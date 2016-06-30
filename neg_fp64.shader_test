@@ -7,19 +7,18 @@ GLSL >= 1.30
 [vertex shader]
 void main()
 {
-   gl_Position = gl_Vertex;
+    gl_Position = gl_Vertex;
 }
 
 [fragment shader]
-/*************************************************
-* Negate value of a Float64 :
-* Toggle the sign bit
-*************************************************/
+/* Negate value of a Float64 :
+ * Toggle the sign bit
+ */
 
 uvec2 neg_fp64(uvec2 a)
 {
-   a.x ^= (1<<31);
-   return a;
+    a.x ^= (1<<31);
+    return a;
 }
 
 uniform uvec2 a;
@@ -27,12 +26,12 @@ uniform uvec2 expected;
 
 void main()
 {
-   /* Generate green if the expected value is produced, red
-    * otherwise. 
-    */
-   gl_FragColor = neg_fp64(a) == expected
-      ? vec4(0.0, 1.0, 0.0, 1.0)
-      : vec4(1.0, 0.0, 0.0, 1.0);
+    /* Generate green if the expected value is produced, red
+     * otherwise. 
+     */
+    gl_FragColor = neg_fp64(a) == expected
+        ? vec4(0.0, 1.0, 0.0, 1.0)
+        : vec4(1.0, 0.0, 0.0, 1.0);
 }
 
 [test]

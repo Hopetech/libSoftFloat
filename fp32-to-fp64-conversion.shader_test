@@ -7,78 +7,70 @@ GLSL >= 1.30
 [vertex shader]
 void main()
 {
-   gl_Position = gl_Vertex;
+    gl_Position = gl_Vertex;
 }
 
 [fragment shader]
-/****************************************************************************
-* Packs the sign `aSign', exponent `aExp', and fraction `aFrac' into a
-* double-precision floating-point value, returning the result.  After being
-* shifted into the proper positions, the three fields are simply added
-* together to form the result.
-****************************************************************************/
+/* Packs the sign `aSign', exponent `aExp', and fraction `aFrac' into a
+ * double-precision floating-point value, returning the result.  After being
+ * shifted into the proper positions, the three fields are simply added
+ * together to form the result.
+ */
 uvec2 packFloat64( uint aSign, uint aExp, uint aFrac )
 {
-   return uvec2((aSign + ((aExp + 0x380) << 20) + (aFrac >> 3)), (aFrac << 28));
+    return uvec2((aSign + ((aExp + 0x380) << 20) + (aFrac >> 3)), (aFrac << 28));
 }
 
-/****************************************************************************
-* Returns the fraction bits of the single-precision floating-point value `a'.
-****************************************************************************/
+/* Returns the fraction bits of the single-precision floating-point value `a'.*/
 uint extractFloat32Frac( uint a )
 {
-  return a & 0x007FFFFF;
+    return a & 0x007FFFFF;
 }
 
-/****************************************************************************
-* Returns the exponent bits of the single-precision floating-point value `a'.
-****************************************************************************/
+/* Returns the exponent bits of the single-precision floating-point value `a'.*/
 uint extractFloat32Exp( uint a )
 {
-   return (a>>23) & 0xFF;
+    return (a>>23) & 0xFF;
 }
 
-/****************************************************************************
-* Returns the sign bit of the single-precision floating-point value `a'.
-****************************************************************************/
+/* Returns the sign bit of the single-precision floating-point value `a'.*/
 uint extractFloat32Sign( uint a )
 {
-   return a & 0x80000000;
+    return a & 0x80000000;
 }
 
-/****************************************************************************
-* Returns the result of converting the single-precision floating-point value
-* `a' to the double-precision floating-point format.
-****************************************************************************/
+/* Returns the result of converting the single-precision floating-point value
+ * `a' to the double-precision floating-point format.
+ */
 uvec2 fp32_to_fp64( uint a )
 {
-   uint aFrac;
-   uint aExp;
-   uint aSign;
+    uint aFrac;
+    uint aExp;
+    uint aSign;
 
-   aFrac = extractFloat32Frac( a );
-   aExp = extractFloat32Exp( a );
-   aSign = extractFloat32Sign( a );
+    aFrac = extractFloat32Frac( a );
+    aExp = extractFloat32Exp( a );
+    aSign = extractFloat32Sign( a );
    
-   if(aExp == 0xFF) {
-      if( aFrac ) {
-         /* NaN */
-         return uvec2( (aSign | 0x7FF00000 | (aFrac >> 3)), (aFrac << 28) );
-      }
-      /* Inf */
-      return uvec2( (aSign | 0x7FF00000), 0 );
-   }
+    if(aExp == 0xFF) {
+        if( aFrac ) {
+            /* NaN */
+            return uvec2( (aSign | 0x7FF00000 | (aFrac >> 3)), (aFrac << 28) );
+        }
+        /* Inf */
+        return uvec2( (aSign | 0x7FF00000), 0 );
+    }
 
-   if( aExp == 0 ) {
-      if( aFrac ) {
-         /* Denormals */
-         return uvec2(0,0);
-      }
-   /* Zero */
-   return packFloat64(aSign, 0, 0);
-   }
+    if( aExp == 0 ) {
+        if( aFrac ) {
+            /* Denormals */
+            return uvec2(0,0);
+        }
+    /* Zero */
+    return packFloat64(aSign, 0, 0);
+    }
 
-   return packFloat64(aSign, aExp, aFrac);
+    return packFloat64(aSign, aExp, aFrac);
 }
 
 uniform uint a;

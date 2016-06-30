@@ -7,19 +7,18 @@ GLSL >= 1.30
 [vertex shader]
 void main()
 {
-   gl_Position = gl_Vertex;
+    gl_Position = gl_Vertex;
 }
 
 [fragment shader]
-/*************************************************
-* Absolute value of a Float64 :
-* Clear the sign bit
-*************************************************/
+/* Absolute value of a Float64 :
+ * Clear the sign bit
+ */
 
 uvec2 abs_fp64(uvec2 a)
 {
-   a.x &= 0x7FFFFFFFu;
-   return a;
+    a.x &= 0x7FFFFFFFu;
+    return a;
 }
 
 uniform uvec2 a;
