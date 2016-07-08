@@ -1,0 +1,86 @@
+# Check if double 'a' is less than 'b' 
+# IEEE 754 compliant
+
+[require]
+GLSL >= 1.30
+
+[vertex shader]
+void main()
+{
+    gl_Position = gl_Vertex;
+}
+
+[fragment shader]
+/* Returns the fraction bits of the double-precision floating-point value `a'.*/
+uvec2 extractFloat64Frac( uvec2 a )
+{
+    return uvec2( a.x & 0x000FFFFF, a.y );
+}
+
+/* Returns the exponent bits of the double-precision floating-point value `a'.*/
+uint extractFloat64Exp( uvec2 a )
+{
+    return (a.x>>21) & 0x7FF;
+}
+
+/* Returns the sign bit of the double-precision floating-point value `a'.*/
+uint extractFloat64Sign( uvec2 a )
+{
+    return a.x & 0x80000000;
+}
+
+/* Returns 1 if */
+bool lt_fp64( uvec2 a, uvec2 b )
+{
+    uint aSign;
+    uint aExp;
+    uint bSign;
+    uint bExp;
+    bvec2 zEq;
+    bvec2 zLt; 
+    bool zInf;
+
+    if( ( ( extractFloat64Exp( a ) == 0x7FF ) && extractFloat64Frac( a ) ) 
+      || ( ( extractFloat64Exp( b ) == 0x7FF ) && extractFloat64Frac( b ) ) )
+    {
+    return 0;
+    }
+    aSign = extractFloat64Sign( a );
+    bSign = extractFloat64Sign( b );
+    if( aSign != bSign ) 
+    {
+        return (aSign>>31) && (((a.x | b.x)<<1) == 0 && (a.y | b.y) != 0);
+    }
+    zEq = equal(a,b);
+    zLt = lessThan(a,b);
+    if( zLt.x ) zInf = 1;
+    if( zEq.x ) zInf = zLt.y;   
+    return (zEq.x != 0 || zEq.y != 0) && (aSign>>31) ^ zInf;
+}
+
+uniform uvec2 a;
+uniform uvec2 b;
+uniform bool expected;
+
+void main()
+{
+    /* Generate green if the expected value is producted, red
+     * otherwise.
+     */
+    gl_FragColor = lt_fp64(a,b) == expected
+        ? vec4(0.0, 1.0, 0.0, 1.0)
+        : vec4(1.0, 0.0, 0.0, 1.0);
+}
+
+[test]
+# A bunch of tests to run.  The 'uniform' lines set the uniforms.  The
+# 'draw rect' line draws a rectangle that covers the whole window.
+# The 'probe all' line verifies that every pixel contains the expected
+# color.
+
+# Try +0.0 and +0.0
+uniform uvec2 a        0x00000000 0x00000000
+uniform uvec2 b        0x00000000 0x00000000
+uniform bool expected  0
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
