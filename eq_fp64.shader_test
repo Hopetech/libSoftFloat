@@ -20,13 +20,7 @@ uvec2 extractFloat64Frac( uvec2 a )
 /* Returns the exponent bits of the double-precision floating-point value `a'.*/
 uint extractFloat64Exp( uvec2 a )
 {
-    return (a.x>>21) & 0x7FF;
-}
-
-/* Returns the sign bit of the double-precision floating-point value `a'.*/
-uint extractFloat64Sign( uvec2 a )
-{
-    return a.x & 0x80000000;
+    return (a.x>>20) & 0x7FF;
 }
 
 /* Returns 1 if the double-precision floating-point value `a' is equal to the

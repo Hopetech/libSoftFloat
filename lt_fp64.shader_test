@@ -20,13 +20,13 @@ uvec2 extractFloat64Frac( uvec2 a )
 /* Returns the exponent bits of the double-precision floating-point value `a'.*/
 uint extractFloat64Exp( uvec2 a )
 {
-    return (a.x>>21) & 0x7FF;
+    return (a.x>>20) & 0x7FF;
 }
 
 /* Returns the sign bit of the double-precision floating-point value `a'.*/
 uint extractFloat64Sign( uvec2 a )
 {
-    return a.x & 0x80000000;
+    return (a.x>>31);
 }
 
 /* Returns 1 if the double-precision floating-point value `a' is less than
@@ -52,13 +52,13 @@ bool lt_fp64( uvec2 a, uvec2 b )
     bSign = extractFloat64Sign( b );
     if( aSign != bSign ) 
     {
-        return (aSign>>31) && (((a.x | b.x)<<1) == 0 && (a.y | b.y) != 0);
+        return aSign && (((a.x | b.x)<<1) == 0 && (a.y | b.y) != 0);
     }
     zEq = equal(a,b);
     zLt = lessThan(a,b);
     if( zLt.x ) zInf = 1;
     if( zEq.x ) zInf = zLt.y;   
-    return (zEq.x != 0 || zEq.y != 0) && (aSign>>31) ^ zInf;
+    return (zEq.x != 0 || zEq.y != 0) && aSign ^ zInf;
 }
 
 uniform uvec2 a;
