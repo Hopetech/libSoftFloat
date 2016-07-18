@@ -21,6 +21,58 @@ uvec2 packFloat64( uint aSign, uint aExp, uvec2 aFrac )
     return uvec2(aSign + (aExp << 20) + aFrac.x, aFrac.y);
 }
 
+/* Returns the number of leading 0 bits before the most-significant 1 bit of
+ * `a'.  If `a' is zero, 32 is returned.
+ */
+uint countLeadingZeros32( uint a )
+{
+    static const int8 countLeadingZerosHigh[] = {
+        8, 7, 6, 6, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4,
+        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    };
+    uint shiftCount;
+
+    shiftCount = 0;
+    if ( a < 0x10000 ) {
+        shiftCount += 16;
+        a <<= 16;
+    }
+    if ( a < 0x1000000 ) {
+        shiftCount += 8;
+        a <<= 8;
+    }
+    shiftCount += countLeadingZerosHigh[ a>>24 ];
+    return shiftCount;
+}
+
+/* Normalizes the subnormal single-precision floating-point value represented
+ * by the denormalized significand `aFrac'.  The normalized exponent and
+ * significand are stored at the locations pointed to by `zExpPtr' and
+ * `zFracPtr', respectively.
+ */
+void normalizeFloat32Subnormal( uint aFrac, uint *zExpPtr, uint *zFracPtr )
+{
+    uint shiftCount;
+
+    shiftCount = countLeadingZeros32( aFrac ) - 8;
+    *zFracPtr = aFrac<<shiftCount;
+    *zExpPtr = 1 - shiftCount;
+}
+
 /* Returns the fraction bits of the single-precision floating-point value `a'.*/
 uint extractFloat32Frac( uint a )
 {
@@ -55,22 +107,23 @@ uvec2 fp32_to_fp64( uint a )
     if(aExp == 0xFF) {
         if( aFrac ) {
             /* NaN */
-            return uvec2( (aSign | 0x7FF00000 | (aFrac >> 3)), (aFrac << 29) );
+            return uvec2( (aSign | 0x7FF00000 | (aFrac>>3)), (aFrac<<29) );
         }
         /* Inf */
-        return uvec2( (aSign | 0x7FF00000), 0 );
+        return packFloat64( aSign, 0x7FF, uvec2(0,0) );
     }
 
     if( aExp == 0 ) {
         if( aFrac ) {
             /* Denormals */
-            return uvec2(0,0);
+            normalizeFloat32Subnormal( aFrac, &aExp, &aFrac );
+            --aExp;
         }
     /* Zero */
-    return packFloat64(aSign, 0, uvec2(0,0));
+    return packFloat64( aSign, 0, uvec2(0,0) );
     }
 
-    return packFloat64( aSign, aExp + 0x380, uvec2( aFrac >> 3, aFrac << 29 );
+    return packFloat64( aSign, aExp + 0x380, uvec2( aFrac>>3, aFrac<<29 );
 }
 
 uniform uint a;
