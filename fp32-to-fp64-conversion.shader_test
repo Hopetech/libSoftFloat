@@ -11,14 +11,23 @@ void main()
 }
 
 [fragment shader]
-/* Packs the sign `aSign', exponent `aExp', and fraction `aFrac' into a
- * double-precision floating-point value, returning the result.  After being
- * shifted into the proper positions, the three fields are simply added
- * together to form the result.
+/* Packs the sign `zSign', the exponent `zExp', and the significand formed by
+ * the concatenation of `zFrac0' and `zFrac1' into a double-precision floating-
+ * point value, returning the result.  After being shifted into the proper
+ * positions, the three fields `zSign', `zExp', and `zFrac0' are simply added
+ * together to form the most significant 32 bits of the result.  This means
+ * that any integer portion of `zFrac0' will be added into the exponent.  Since
+ * a properly normalized significand will have an integer portion equal to 1,
+ * the `zExp' input should be 1 less than the desired result exponent whenever
+ * `zFrac0' and `zFrac1' concatenated form a complete, normalized significand.
  */
-uvec2 packFloat64( uint aSign, uint aExp, uvec2 aFrac )
+uvec2 packFloat64( uint zSign, uint zExp, uint zFrac0, uint zFrac1 )
 {
-    return uvec2(aSign + (aExp << 20) + aFrac.x, aFrac.y);
+    uvec2 z;
+
+    z.x = zFrac1;
+    z.y = ( zSign<<31 ) + ( zExp<<20 ) + zFrac0;
+    return z;
 }
 
 /* Returns the number of leading 0 bits before the most-significant 1 bit of
@@ -88,7 +97,7 @@ uint extractFloat32Exp( uint a )
 /* Returns the sign bit of the single-precision floating-point value `a'.*/
 uint extractFloat32Sign( uint a )
 {
-    return a & 0x80000000;
+    return a>>31;
 }
 
 /* Returns the result of converting the single-precision floating-point value
@@ -104,26 +113,26 @@ uvec2 fp32_to_fp64( uint a )
     aExp = extractFloat32Exp( a );
     aSign = extractFloat32Sign( a );
    
-    if(aExp == 0xFF) {
-        if( aFrac ) {
+    if (aExp == 0xFF) {
+        if ( aFrac ) {
             /* NaN */
-            return uvec2( (aSign | 0x7FF00000 | (aFrac>>3)), (aFrac<<29) );
+            return uvec2( ((aSign<<31) | 0x7FF00000 | (aFrac>>3)), (aFrac<<29) );
         }
         /* Inf */
-        return packFloat64( aSign, 0x7FF, uvec2(0,0) );
+        return packFloat64( aSign, 0x7FF, 0, 0) );
     }
 
-    if( aExp == 0 ) {
-        if( aFrac ) {
+    if ( aExp == 0 ) {
+        if ( aFrac ) {
             /* Denormals */
             normalizeFloat32Subnormal( aFrac, &aExp, &aFrac );
             --aExp;
         }
     /* Zero */
-    return packFloat64( aSign, 0, uvec2(0,0) );
+    return packFloat64( aSign, 0, 0, 0 );
     }
 
-    return packFloat64( aSign, aExp + 0x380, uvec2( aFrac>>3, aFrac<<29 );
+    return packFloat64( aSign, aExp + 0x380, aFrac>>3, aFrac<<29 );
 }
 
 uniform uint a;
