@@ -1,0 +1,256 @@
+# Conversion from double to float 
+# IEEE 754 compliant
+
+[require]
+GLSL >= 1.30
+
+[vertex shader]
+void main()
+{
+    gl_Position = gl_Vertex;
+}
+
+[fragment shader]
+/* Software IEEE floating-point rounding mode. */
+uint float_rounding_mode;
+const uint float_round_nearest_even = 0;
+const uint float_round_to_zero      = 1;
+const uint float_round_down         = 2;
+const uint float_round_up           = 3;
+
+/* Software IEEE floating-point underflow tininess-detection mode. */
+uint float_detect_tininess;
+const uint float_tininess_after_rounding  = 0;
+const uint float_tininess_before_rounding = 1;
+
+/* Packs the sign `zSign', exponent `zExp', and significand `zFrac' into a
+ * single-precision floating-point value, returning the result.  After being
+ * shifted into the proper positions, the three fields are simply added
+ * together to form the result.  This means that any integer portion of `zSig'
+ * will be added into the exponent.  Since a properly normalized significand
+ * will have an integer portion equal to 1, the `zExp' input should be 1 less
+ * than the desired result exponent whenever `zFrac' is a complete, normalized
+ * significand.
+ */
+float packFloat32( uint zSign, uint zExp, uint zFrac )
+{
+    return ( zSign<<31 ) + ( zExp<<23 ) + zFrac;
+}
+
+/* Shifts `a' right by the number of bits given in `count'.  If any nonzero
+ * bits are shifted off, they are "jammed" into the least significant bit of
+ * the result by setting the least significant bit to 1.  The value of `count'
+ * can be arbitrarily large; in particular, if `count' is greater than 32, the
+ * result will be either 0 or 1, depending on whether `a' is zero or nonzero.
+ * The result is stored in the location pointed to by `zPtr'.
+ */
+void shift32RightJamming( uint a, uint count, uint *zPtr )
+{
+    uint z;
+
+    if( count == 0 ) {
+        z = a;
+    }
+    else if( count < 32 ) {
+        z = ( a>>count ) | ( ( a<<( ( - count ) & 31 ) ) != 0 );
+    }
+    else {
+        z = ( a != 0 );
+    }
+    *zPtr = z;
+}
+
+/* Shifts the 64-bit value formed by concatenating `a.x' and `a.y' right by the
+ * number of bits given in `count'.  If any nonzero bits are shifted off, they
+ * are "jammed" into the least significant bit of the result by setting the
+ * least significant bit to 1.  The value of `count' can be arbitrarily large;
+ * in particular, if `count' is greater than 64, the result will be either 0
+ * or 1, depending on whether the concatenation of `a.x' and `a.y' is zero or
+ * nonzero.  The result is broken into two 32-bit pieces which are stored at
+ * the locations pointed to by `z0Ptr' and `z1Ptr'.
+ */
+void shift64RightJamming( uvec2 a, uint count, uint *z0Ptr, uint *z1Ptr )
+{
+    uint z0;
+    uint z1;
+    uint negCount = ( - count ) & 31;
+
+    if ( count == 0 ) {
+        z1 = a.y;
+        z0 = a.x;
+    }
+    else if ( count < 32 ) {
+        z1 = ( a.x<<negCount ) | ( a.y>>count ) | ( ( a.y<<negCount ) != 0 );
+        z0 = a.x>>count;
+    }
+    else {
+        if ( count == 32 ) {
+            z1 = a.x | ( a.y != 0 );
+        }
+        else if ( count < 64 ) {
+            z1 = ( a.x>>( count & 31 ) ) | ( ( ( a.x<<negCount ) | a.y ) != 0 );
+        }
+        else {
+            z1 = ( ( a.x | a.y ) != 0 );
+        }
+        z0 = 0;
+    }
+    *z1Ptr = z1;
+    *z0Ptr = z0;
+}
+
+/* Takes an abstract floating-point value having sign `zSign', exponent `zExp',
+ * and significand `zFrac', and returns the proper single-precision floating-
+ * point value corresponding to the abstract input.  Ordinarily, the abstract
+ * value is simply rounded and packed into the single-precision format, with
+ * the inexact exception raised if the abstract input cannot be represented
+ * exactly.  However, if the abstract value is too large, the overflow and
+ * inexact exceptions are raised and an infinity or maximal finite value is
+ * returned.  If the abstract value is too small, the input value is rounded to
+ * a subnormal number, and the underflow and inexact exceptions are raised if
+ * the abstract input cannot be represented exactly as a subnormal single-
+ * precision floating-point number.
+ *     The input significand `zFrac' has its binary point between bits 30
+ * and 29, which is 7 bits to the left of the usual location.  This shifted
+ * significand must be normalized or smaller.  If `zFrac' is not normalized,
+ * `zExp' must be 0; in that case, the result returned is a subnormal number,
+ * and it must not require rounding.  In the usual case that `zFrac' is
+ * normalized, `zExp' must be 1 less than the "true" floating-point exponent.
+ * The handling of underflow and overflow follows the IEEE Standard for
+ * Floating-Point Arithmetic.
+ */
+float roundAndPackFloat32( uint zSign, uint zExp, uint zFrac )
+{
+    uint roundingMode;
+    uint roundNearestEven;
+    uint roundIncrement;
+    uint roundBits;
+    bool isTiny;
+
+    roundingMode = float_rounding_mode;
+    roundNearestEven = roundingMode == float_round_nearest_even;
+    roundIncrement = 0x40;
+    if ( ! roundNearestEven ) {
+        if ( roundingMode == float_round_to_zero ) {
+            roundIncrement = 0;
+        }
+        else {
+            roundIncrement = 0x7F;
+            if ( zSign ) {
+                if ( roundingMode == float_round_up ) roundIncrement = 0;
+            }
+            else {
+                if ( roundingMode == float_round_down ) roundIncrement = 0;
+            }
+        }
+    }
+    roundBits = zFrac & 0x7F;
+    if ( 0xFD <= zExp ) {
+        if (    ( 0xFD < zExp )
+             || (    ( zExp == 0xFD )
+                  && ( ( zFrac + roundIncrement ) < 0 ) )
+           ) {
+            return packFloat32( zSign, 0xFF, 0 ) - ( roundIncrement == 0 );
+        }
+        if ( zExp < 0 ) {
+            isTiny =
+                   ( float_detect_tininess == float_tininess_before_rounding )
+                || ( zExp < -1 ) || ( zFrac + roundIncrement < 0x80000000 );
+            shift32RightJamming( zFrac, - zExp, &zFrac );
+            zExp = 0;
+            roundBits = zFrac & 0x7F;
+        }
+    }
+    zFrac = ( zFrac + roundIncrement )>>7;
+    zFrac &= ~ ( ( ( roundBits ^ 0x40 ) == 0 ) & roundNearestEven );
+    if ( zFrac == 0 ) zExp = 0;
+    return packFloat32( zSign, zExp, zFrac );
+}
+
+
+/* Returns the fraction bits of the double-precision floating-point value `a'.*/
+uvec2 extractFloat64Frac( uvec2 a )
+{
+    return uvec2( a.x & 0x000FFFFF, a.y );
+}
+
+/* Returns the exponent bits of the double-precision floating-point value `a'.*/
+uint extractFloat64Exp( uvec2 a )
+{
+    return (a.x>>20) & 0x7FF;
+}
+
+/* Returns the sign bit of the double-precision floating-point value `a'.*/
+uint extractFloat64Sign( uvec2 a )
+{
+    return (a.x>>31);
+}
+
+/* Returns the result of converting the double-precision floating-point value
+ * `a' to the single-precision floating-point format.  The conversion is
+ * performed according to the IEEE Standard for Floating-Point Arithmetic.
+ */
+uint fp64_to_fp32( uvec2 a )
+{
+    uint aSign;
+    uint aExp;
+    uint zFrac;
+    uvec2 aFrac;
+    uint allZero;
+
+    aFrac = extractFloat64Frac( a );
+    aExp = extractFloat64Exp( a );
+    aSign = extractFloat64Sign( a );
+    if ( aExp == 0x7FF ) {
+        if ( aFrac.x | aFrac.y ) {
+            return (aSign<<31) | 0x7FC00000 | ((aFrac.x<<12)>>9) | (aFrac.y>>29);
+        }
+        return packFloat32( aSign, 0xFF, 0 );
+    }
+    shift64RightJamming( aFrac, 22, &allZero, &zFrac );
+    if ( aExp ) zFrac |= 0x40000000;
+    return roundAndPackFloat32( aSign, aExp - 0x381, zFrac );
+}
+
+uniform uvec2 a;
+uniform uint expected;
+
+void main()
+{
+    /* Generate green if the expected value is producted, red
+     * otherwise.
+     */
+    gl_FragColor = fp64_to_fp32(a) == expected
+        ? vec4(0.0, 1.0, 0.0, 1.0)
+        : vec4(1.0, 0.0, 0.0, 1.0);
+}
+
+[test]
+# A bunch of tests to run.  The 'uniform' lines set the uniforms.  The
+# 'draw rect' line draws a rectangle that covers the whole window.
+# The 'probe all' line verifies that every pixel contains the expected
+# color.
+
+# Try +0.0
+uniform uvec2 a       0x00000000 0x00000000
+uniform uint expected 0x00000000
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
+
+# Try -0.0
+uniform uvec2 a       0x80000000 0x00000000
+uniform uint expected 0x80000000
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
+
+# Try +Inf
+uniform uvec2 a       0x7FF00000 0x00000000
+uniform uint expected 0x7F800000
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
+
+# Try -Inf
+uniform uvec2 a       0x7FF00000 0x00000000
+uniform uint expected 0x7F800000
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
