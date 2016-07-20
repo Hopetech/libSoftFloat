@@ -14,7 +14,6 @@ void main()
 /* Absolute value of a Float64 :
  * Clear the sign bit
  */
-
 uvec2 abs_fp64(uvec2 a)
 {
     a.x &= 0x7FFFFFFFu;
