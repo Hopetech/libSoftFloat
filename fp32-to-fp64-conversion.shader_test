@@ -116,7 +116,10 @@ uvec2 fp32_to_fp64( uint a )
     if (aExp == 0xFF) {
         if ( aFrac ) {
             /* NaN */
-            return uvec2( ((aSign<<31) | 0x7FF00000 | (aFrac>>3)), (aFrac<<29) );
+            return uvec2(
+                ( ( aSign<<31 ) | 0x7FF00000 | ( aFrac>>3 ) ),
+                ( aFrac<<29 )
+            );
         }
         /* Inf */
         return packFloat64( aSign, 0x7FF, 0, 0) );

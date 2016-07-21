@@ -195,15 +195,16 @@ uint fp64_to_fp32( uvec2 a )
     uint aSign;
     uint aExp;
     uint zFrac;
-    uvec2 aFrac;
     uint allZero;
+    uvec2 aFrac;
 
     aFrac = extractFloat64Frac( a );
     aExp = extractFloat64Exp( a );
     aSign = extractFloat64Sign( a );
     if ( aExp == 0x7FF ) {
         if ( aFrac.x | aFrac.y ) {
-            return (aSign<<31) | 0x7FC00000 | ((aFrac.x<<12)>>9) | (aFrac.y>>29);
+            return ( aSign<<31 ) | 0x7FC00000
+                | ( ( aFrac.x & 0x000FFFFF )<<3 ) | ( aFrac.y>>29 );
         }
         return packFloat32( aSign, 0xFF, 0 );
     }
