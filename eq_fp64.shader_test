@@ -29,15 +29,23 @@ uint extractFloat64Exp( uvec2 a )
  */
 bool eq_fp64( uvec2 a, uvec2 b )
 {
-    bvec2 zEq;
-    if( ( ( extractFloat64Exp( a ) == 0x7FF ) && extractFloat64Frac( a ) ) 
-      || ( ( extractFloat64Exp( b ) == 0x7FF ) && extractFloat64Frac( b ) ) )
-    {
-    return 0;
+    uvec2 aFrac;
+    uvec2 bFrac;
+
+    aFrac = extractFloat64Frac( a );
+    bFrac = extractFloat64Frac( b );
+    if (    (    ( extractFloat64Exp( a ) == 0x7FF )
+              && ( aFrac.x | aFrac.y ) )
+         || (    ( extractFloat64Exp( b ) == 0x7FF )
+              && ( bFrac.x | bFrac.y ) )
+       ) {
+        return 0;
     }
-    zEq = equal(a,b);
-    return ( zEq.x == zEq.y ) ||
-           ( ( ((a.x | b.x)<<1) == 0 ) && ((a.y | b.y) == 0) );
+    return ( a.y == b.y )
+        && ( ( a.x == a.x )
+            || ( ( a.y == 0 )
+                && ( ( ( a.x | b.x )<1) == 0 ) )
+        );
 }
 
 uniform uvec2 a;

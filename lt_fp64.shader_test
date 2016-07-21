@@ -29,6 +29,15 @@ uint extractFloat64Sign( uvec2 a )
     return (a.x>>31);
 }
 
+/* Returns 1 if the 64-bit value formed by concatenating `a0' and `a1' is less
+ * than the 64-bit value formed by concatenating `b0' and `b1'.  Otherwise,
+ * returns 0.
+ */
+bool lt64( uint a0, uint a1, uint b0, uint b1 )
+{
+    return ( a0 < b0 ) || ( ( a0 == b0 ) && ( a1 < b1 ) );
+}
+
 /* Returns 1 if the double-precision floating-point value `a' is less than
  * the corresponding value `b', and 0 otherwise.  The comparison is performed
  * according to the IEEE Standard for Floating-Point Arithmetic.
@@ -36,29 +45,30 @@ uint extractFloat64Sign( uvec2 a )
 bool lt_fp64( uvec2 a, uvec2 b )
 {
     uint aSign;
-    uint aExp;
     uint bSign;
-    uint bExp;
-    bvec2 zEq;
-    bvec2 zLt; 
-    bool zInf;
+    uvec2 aFrac;
+    uvec2 bFrac;
 
-    if( ( ( extractFloat64Exp( a ) == 0x7FF ) && extractFloat64Frac( a ) ) 
-      || ( ( extractFloat64Exp( b ) == 0x7FF ) && extractFloat64Frac( b ) ) )
-    {
-    return 0;
+    aFrac = extractFloat64Frac( a );
+    bFrac = extractFloat64Frac( b );
+    if (    (    ( extractFloat64Exp( a ) == 0x7FF )
+              && ( aFrac.x | aFrac.y ) )
+         || (    ( extractFloat64Exp( b ) == 0x7FF )
+              && ( bFrac.x | bFrac.y ) )
+       ) {
+        return 0;
     }
     aSign = extractFloat64Sign( a );
     bSign = extractFloat64Sign( b );
     if( aSign != bSign ) 
     {
-        return aSign && (((a.x | b.x)<<1) == 0 && (a.y | b.y) != 0);
+        return aSign
+            && (    ( ( ( ( a.x | b.x )<<1 ) ) | a.y | b.y )
+                 != 0 );
     }
-    zEq = equal(a,b);
-    zLt = lessThan(a,b);
-    if( zLt.x ) zInf = 1;
-    if( zEq.x ) zInf = zLt.y;   
-    return (zEq.x != 0 || zEq.y != 0) && aSign ^ zInf;
+    return
+          aSign ? lt64( b.x, b.y, a.x, a.y )
+        : lt64( a.x, a.y, b.x, b.y );
 }
 
 uniform uvec2 a;
