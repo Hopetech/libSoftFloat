@@ -5,12 +5,16 @@
 GLSL >= 1.30
 
 [vertex shader]
+#version 130
+
 void main()
 {
     gl_Position = gl_Vertex;
 }
 
 [fragment shader]
+#version 130
+
 /* Packs the sign `zSign', the exponent `zExp', and the significand formed by
  * the concatenation of `zFrac0' and `zFrac1' into a double-precision floating-
  * point value, returning the result.  After being shifted into the proper
@@ -25,8 +29,8 @@ uvec2 packFloat64( uint zSign, uint zExp, uint zFrac0, uint zFrac1 )
 {
     uvec2 z;
 
-    z.x = zFrac1;
-    z.y = ( zSign<<31 ) + ( zExp<<20 ) + zFrac0;
+    z.x = ( zSign<<31 ) + ( zExp<<20 ) + zFrac0;
+    z.y = zFrac1;
     return z;
 }
 
@@ -35,33 +39,33 @@ uvec2 packFloat64( uint zSign, uint zExp, uint zFrac0, uint zFrac1 )
  */
 uint countLeadingZeros32( uint a )
 {
-    const uint countLeadingZerosHigh[] = {
-        8, 7, 6, 6, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4,
-        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-    };
+   const uint countLeadingZerosHigh[] = uint[](
+        8u, 7u, 6u, 6u, 5u, 5u, 5u, 5u, 4u, 4u, 4u, 4u, 4u, 4u, 4u, 4u,
+        3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u,
+        2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u,
+        2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u,
+        1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+        1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+        1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+        1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
+        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
+        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
+        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
+        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
+        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
+        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
+        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u
+    );
     uint shiftCount;
 
-    shiftCount = 0;
-    if ( a < 0x10000 ) {
-        shiftCount += 16;
+    shiftCount = 0u;
+    if ( ( a < 0x10000u ) == true ) {
+        shiftCount += 16u;
         a <<= 16;
     }
-    if ( a < 0x1000000 ) {
-        shiftCount += 8;
+    if ( ( a < 0x1000000u ) == true ) {
+        shiftCount += 8u;
         a <<= 8;
     }
     shiftCount += countLeadingZerosHigh[ a>>24 ];
@@ -81,21 +85,21 @@ void normalizeFloat32Subnormal(
 {
     uint shiftCount;
 
-    shiftCount = countLeadingZeros32( aFrac ) - 8;
+    shiftCount = countLeadingZeros32( aFrac ) - 8u;
     zFracPtr = aFrac<<shiftCount;
-    zExpPtr = 1 - shiftCount;
+    zExpPtr = 1u - shiftCount;
 }
 
 /* Returns the fraction bits of the single-precision floating-point value `a'.*/
 uint extractFloat32Frac( uint a )
 {
-    return a & 0x007FFFFF;
+    return a & 0x007FFFFFu;
 }
 
 /* Returns the exponent bits of the single-precision floating-point value `a'.*/
 uint extractFloat32Exp( uint a )
 {
-    return (a>>23) & 0xFF;
+    return (a>>23) & 0xFFu;
 }
 
 /* Returns the sign bit of the single-precision floating-point value `a'.*/
@@ -117,29 +121,29 @@ uvec2 fp32_to_fp64( uint a )
     aExp = extractFloat32Exp( a );
     aSign = extractFloat32Sign( a );
    
-    if (aExp == 0xFF) {
-        if ( aFrac ) {
+    if ( aExp == 0xFFu ) {
+        if ( aFrac != 0u ) {
             /* NaN */
             return uvec2(
-                ( ( aSign<<31 ) | 0x7FF00000 | ( aFrac>>3 ) ),
+                ( ( aSign<<31 ) | 0x7FF00000u | ( aFrac>>3 ) ),
                 ( aFrac<<29 )
             );
         }
         /* Inf */
-        return packFloat64( aSign, 0x7FF, 0, 0) );
+        return packFloat64( aSign, 0x7FFu, 0u, 0u );
     }
 
-    if ( aExp == 0 ) {
-        if ( aFrac ) {
+    if ( aExp == 0u ) {
+        if ( aFrac != 0u ) {
             /* Denormals */
             normalizeFloat32Subnormal( aFrac, aExp, aFrac );
             --aExp;
         }
     /* Zero */
-    return packFloat64( aSign, 0, 0, 0 );
+    return packFloat64( aSign, 0u, 0u, 0u );
     }
 
-    return packFloat64( aSign, aExp + 0x380, aFrac>>3, aFrac<<29 );
+    return packFloat64( aSign, aExp + 0x380u, aFrac>>3, aFrac<<29 );
 }
 
 uniform uint a;
