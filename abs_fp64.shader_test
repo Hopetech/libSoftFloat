@@ -5,12 +5,16 @@
 GLSL >= 1.30
 
 [vertex shader]
+#version 130
+
 void main()
 {
     gl_Position = gl_Vertex;
 }
 
 [fragment shader]
+#version 130
+
 /* Absolute value of a Float64 :
  * Clear the sign bit
  */
