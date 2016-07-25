@@ -68,7 +68,6 @@ bool le_fp64( uvec2 a, uvec2 b )
     return
           aSign ? le64( b.x, b.y, a.x, a.y )
         : le64( a.x, a.y, b.x, b.y );
-
 }
 
 uniform uvec2 a;
