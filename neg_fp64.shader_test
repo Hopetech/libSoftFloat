@@ -5,18 +5,22 @@
 GLSL >= 1.30
 
 [vertex shader]
+#version 130
+
 void main()
 {
     gl_Position = gl_Vertex;
 }
 
 [fragment shader]
+#version 130
+
 /* Negate value of a Float64 :
  * Toggle the sign bit
  */
 uvec2 neg_fp64(uvec2 a)
 {
-    a.x ^= (1<<31);
+    a.x ^= (1u<<31);
     return a;
 }
 
