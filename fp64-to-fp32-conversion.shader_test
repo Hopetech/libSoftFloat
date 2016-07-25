@@ -44,7 +44,7 @@ float packFloat32( uint zSign, uint zExp, uint zFrac )
  * result will be either 0 or 1, depending on whether `a' is zero or nonzero.
  * The result is stored in the location pointed to by `zPtr'.
  */
-void shift32RightJamming( uint a, uint count, uint *zPtr )
+void shift32RightJamming( uint a, int count, inout uint zPtr )
 {
     uint z;
 
@@ -57,7 +57,7 @@ void shift32RightJamming( uint a, uint count, uint *zPtr )
     else {
         z = ( a != 0 );
     }
-    *zPtr = z;
+    zPtr = z;
 }
 
 /* Shifts the 64-bit value formed by concatenating `a.x' and `a.y' right by the
@@ -69,11 +69,16 @@ void shift32RightJamming( uint a, uint count, uint *zPtr )
  * nonzero.  The result is broken into two 32-bit pieces which are stored at
  * the locations pointed to by `z0Ptr' and `z1Ptr'.
  */
-void shift64RightJamming( uvec2 a, uint count, uint *z0Ptr, uint *z1Ptr )
+void shift64RightJamming(
+    uvec2 a,
+    int count,
+    inout uint z0Ptr,
+    inout uint z1Ptr
+ )
 {
     uint z0;
     uint z1;
-    uint negCount = ( - count ) & 31;
+    int negCount = ( - count ) & 31;
 
     if ( count == 0 ) {
         z1 = a.y;
@@ -95,8 +100,8 @@ void shift64RightJamming( uvec2 a, uint count, uint *z0Ptr, uint *z1Ptr )
         }
         z0 = 0;
     }
-    *z1Ptr = z1;
-    *z0Ptr = z0;
+    z1Ptr = z1;
+    z0Ptr = z0;
 }
 
 /* Takes an abstract floating-point value having sign `zSign', exponent `zExp',
@@ -156,7 +161,7 @@ float roundAndPackFloat32( uint zSign, uint zExp, uint zFrac )
             isTiny =
                    ( float_detect_tininess == float_tininess_before_rounding )
                 || ( zExp < -1 ) || ( zFrac + roundIncrement < 0x80000000 );
-            shift32RightJamming( zFrac, - zExp, &zFrac );
+            shift32RightJamming( zFrac, - zExp, zFrac );
             zExp = 0;
             roundBits = zFrac & 0x7F;
         }
@@ -208,7 +213,7 @@ uint fp64_to_fp32( uvec2 a )
         }
         return packFloat32( aSign, 0xFF, 0 );
     }
-    shift64RightJamming( aFrac, 22, &allZero, &zFrac );
+    shift64RightJamming( aFrac, 22, allZero, zFrac );
     if ( aExp ) zFrac |= 0x40000000;
     return roundAndPackFloat32( aSign, aExp - 0x381, zFrac );
 }

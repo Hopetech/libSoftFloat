@@ -28,13 +28,20 @@ const uint float_tininess_before_rounding = 1;
  * any carry out is lost.  The result is broken into two 32-bit pieces which
  * are stored at the locations pointed to by `z0Ptr' and `z1Ptr'.
  */
-void add64( uint a0, uint a1, uint b0, uint b1, uint *z0Ptr, uint *z1Ptr )
+void add64(
+    uint a0,
+    uint a1,
+    uint b0,
+    uint b1,
+    inout uint z0Ptr,
+    inout uint z1Ptr
+ )
 {
     uint z1;
 
     z1 = a1 + b1;
-    *z1Ptr = z1;
-    *z0Ptr = a0 + b0 + ( z1 < a1 );
+    z1Ptr = z1;
+    z0Ptr = a0 + b0 + ( z1 < a1 );
 }
 
 /* Shifts the 96-bit value formed by concatenating `a0', `a1', and `a2' right
@@ -58,10 +65,10 @@ void shift64ExtraRightJamming(
      uint a0,
      uint a1,
      uint a2,
-     uint count,
-     uint *z0Ptr,
-     uint *z1Ptr,
-     uint *z2Ptr
+     int count,
+     inout uint z0Ptr,
+     inout uint z1Ptr,
+     inout uint z2Ptr
  )
 {
     uint z0;
@@ -100,9 +107,9 @@ void shift64ExtraRightJamming(
         }
         z2 |= ( a2 != 0 );
     }
-    *z2Ptr = z2;
-    *z1Ptr = z1;
-    *z0Ptr = z0;
+    z2Ptr = z2;
+    z1Ptr = z1;
+    z0Ptr = z0;
 }
 
 /* Returns 1 if the 64-bit value formed by concatenating `a0' and `a1' is
@@ -203,7 +210,7 @@ uvec2 roundAndPackFloat64(
                 || ! increment
                 || lt64( zFrac0, zFrac1, 0x001FFFFF, 0xFFFFFFFF );
             shift64ExtraRightJamming(
-                zFrac0, zFrac1, zFrac2, - zExp, &zFrac0, &zFrac1, &zFrac2 );
+                zFrac0, zFrac1, zFrac2, - zExp, zFrac0, zFrac1, zFrac2 );
             zExp = 0;
             if ( roundNearestEven ) {
                 increment = ( zFrac2 < 0 );
@@ -219,7 +226,7 @@ uvec2 roundAndPackFloat64(
         }
     }
     if ( increment ) {
-        add64( zFrac0, zFrac1, 0, 1, &zFrac0, &zFrac1 );
+        add64( zFrac0, zFrac1, 0, 1, zFrac0, zFrac1 );
         zFrac1 &= ~ ( ( zFrac2 + zFrac2 == 0 ) & roundNearestEven );
     }
     else {
@@ -232,7 +239,7 @@ uvec2 roundAndPackFloat64(
  * into two 32-bit pieces which are stored at the locations pointed to by
  * `z0Ptr' and `z1Ptr'.
  */
-void mul32To64( uint a, uint b, uint *z0Ptr, uint *z1Ptr )
+void mul32To64( uint a, uint b, inout uint z0Ptr, inout uint z1Ptr )
 {
     uint aHigh;
     uint aLow;
@@ -256,8 +263,8 @@ void mul32To64( uint a, uint b, uint *z0Ptr, uint *z1Ptr )
     zMiddleA <<= 16;
     z1 += zMiddleA;
     z0 += ( z1 < zMiddleA );
-    *z1Ptr = z1;
-    *z0Ptr = z0;
+    z1Ptr = z1;
+    z0Ptr = z0;
 }
 
 /* Multiplies the 64-bit value formed by concatenating `a0' and `a1' to the
@@ -270,10 +277,10 @@ void mul64To128(
      uint a1,
      uint b0,
      uint b1,
-     uint *z0Ptr,
-     uint *z1Ptr,
-     uint *z2Ptr,
-     uint *z3Ptr
+     inout uint z0Ptr,
+     inout uint z1Ptr,
+     inout uint z2Ptr,
+     inout uint z3Ptr
  )
 {
     uint z0;
@@ -283,18 +290,18 @@ void mul64To128(
     uint more1;
     uint more2;
 
-    mul32To64( a1, b1, &z2, &z3 );
-    mul32To64( a1, b0, &z1, &more2 );
-    add64( z1, more2, 0, z2, &z1, &z2 );
-    mul32To64( a0, b0, &z0, &more1 );
-    add64( z0, more1, 0, z1, &z0, &z1 );
-    mul32To64( a0, b1, &more1, &more2 );
-    add64( more1, more2, 0, z2, &more1, &z2 );
-    add64( z0, z1, 0, more1, &z0, &z1 );
-    *z3Ptr = z3;
-    *z2Ptr = z2;
-    *z1Ptr = z1;
-    *z0Ptr = z0;
+    mul32To64( a1, b1, z2, z3 );
+    mul32To64( a1, b0, z1, more2 );
+    add64( z1, more2, 0, z2, z1, z2 );
+    mul32To64( a0, b0, z0, more1 );
+    add64( z0, more1, 0, z1, z0, z1 );
+    mul32To64( a0, b1, more1, more2 );
+    add64( more1, more2, 0, z2, more1, z2 );
+    add64( z0, z1, 0, more1, z0, z1 );
+    z3Ptr = z3;
+    z2Ptr = z2;
+    z1Ptr = z1;
+    z0Ptr = z0;
 }
 
 /* Shifts the 64-bit value formed by concatenating `a0' and `a1' left by the
@@ -302,11 +309,17 @@ void mul64To128(
  * of `count' must be less than 32.  The result is broken into two 32-bit
  * pieces which are stored at the locations pointed to by `z0Ptr' and `z1Ptr'.
  */
-void shortShift64Left( uint a0, uint a1, uint count, uint *z0Ptr, uint *z1Ptr )
+void shortShift64Left(
+    uint a0,
+    uint a1,
+    int count,
+    inout uint z0Ptr,
+    inout uint z1Ptr
+ )
 {
 
-    *z1Ptr = a1<<count;
-    *z0Ptr =
+    z1Ptr = a1<<count;
+    z0Ptr =
         ( count == 0 ) ? a0 : ( a0<<count ) | ( a1>>( ( - count ) & 31 ) );
 }
 
@@ -315,7 +328,7 @@ void shortShift64Left( uint a0, uint a1, uint count, uint *z0Ptr, uint *z1Ptr )
  */
 uint countLeadingZeros32( uint a )
 {
-    static const int8 countLeadingZerosHigh[] = {
+    const uint countLeadingZerosHigh[] = {
         8, 7, 6, 6, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4,
         3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
         2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
@@ -359,9 +372,9 @@ uint countLeadingZeros32( uint a )
 void normalizeFloat64Subnormal(
      uint aFrac0,
      uint aFrac1,
-     uint *zExpPtr,
-     uint *zFrac0Ptr,
-     uint *zFrac1Ptr
+     inout uint zExpPtr,
+     inout uint zFrac0Ptr,
+     inout uint zFrac1Ptr
  )
 {
     uint shiftCount;
@@ -369,19 +382,19 @@ void normalizeFloat64Subnormal(
     if ( aFrac0 == 0 ) {
         shiftCount = countLeadingZeros32( aFrac1 ) - 11;
         if ( shiftCount < 0 ) {
-            *zFrac0Ptr = aFrac1>>( - shiftCount );
-            *zFrac1Ptr = aFrac1<<( shiftCount & 31 );
+            zFrac0Ptr = aFrac1>>( - shiftCount );
+            zFrac1Ptr = aFrac1<<( shiftCount & 31 );
         }
         else {
-            *zFrac0Ptr = aFrac1<<shiftCount;
-            *zFrac1Ptr = 0;
+            zFrac0Ptr = aFrac1<<shiftCount;
+            zFrac1Ptr = 0;
         }
-        *zExpPtr = - shiftCount - 31;
+        zExpPtr = - shiftCount - 31;
     }
     else {
         shiftCount = countLeadingZeros32( aFrac0 ) - 11;
         shortShift64Left( aFrac0, aFrac1, shiftCount, zFrac0Ptr, zFrac1Ptr );
-        *zExpPtr = 1 - shiftCount;
+        zExpPtr = 1 - shiftCount;
     }
 }
 
@@ -491,24 +504,24 @@ uvec2 mul_fp64( uvec2 a, uvec2 b )
         if ( ( aFrac.x | aFrac.y ) == 0 ) {
             return packFloat64( zSign, 0, uvec2(0,0) );
         }
-        normalizeFloat64Subnormal( aFrac, &aExp, &aFrac );
+        normalizeFloat64Subnormal( aFrac, aExp, aFrac );
     }
     if ( bExp == 0 ) {
         if ( ( bFrac.x | bFrac.y ) == 0 ) {
             return packFloat64( zSign, 0, uvec2(0,0) );
         }
-        normalizeFloat64Subnormal( bFrac, &bExp, &bFrac );
+        normalizeFloat64Subnormal( bFrac, bExp, bFrac );
     }
     zExp = aExp + bExp - 0x400;
     aFrac.x |= 0x00100000;
-    shortShift64Left( bFrac0, bFrac1, 12, &bFrac0, &bFrac1 );
+    shortShift64Left( bFrac0, bFrac1, 12, bFrac0, bFrac1 );
     mul64To128(
-        aFrac0, aFrac1, bFrac0, bFrac1, &zFrac0, &zFrac1, &zFrac2, &zFrac3 );
-    add64( zFrac0, zFrac1, aFrac0, aFrac1, &zFrac0, &zFrac1 );
+        aFrac0, aFrac1, bFrac0, bFrac1, zFrac0, zFrac1, zFrac2, zFrac3 );
+    add64( zFrac0, zFrac1, aFrac0, aFrac1, zFrac0, zFrac1 );
     zFrac2 |= ( zFrac3 != 0 );
     if ( 0x00200000 <= zFrac0 ) {
         shift64ExtraRightJamming(
-            zFrac0, zFrac1, zFrac2, 1, &zFrac0, &zFrac1, &zFrac2 );
+            zFrac0, zFrac1, zFrac2, 1, zFrac0, zFrac1, zFrac2 );
         ++zExp;
     }
     return roundAndPackFloat64( zSign, zExp, zFrac0, zFrac1, zFrac2 );
