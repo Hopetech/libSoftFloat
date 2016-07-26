@@ -5,22 +5,26 @@
 GLSL >= 1.30
 
 [vertex shader]
+#version 130
+
 void main()
 {
     gl_Position = gl_Vertex;
 }
 
 [fragment shader]
+#version 130
+
 /* Returns the fraction bits of the double-precision floating-point value `a'.*/
 uvec2 extractFloat64Frac( uvec2 a )
 {
-    return uvec2( a.x & 0x000FFFFF, a.y );
+    return uvec2( a.x & 0x000FFFFFu, a.y );
 }
 
 /* Returns the exponent bits of the double-precision floating-point value `a'.*/
 uint extractFloat64Exp( uvec2 a )
 {
-    return (a.x>>20) & 0x7FF;
+    return (a.x>>20) & 0x7FFu;
 }
 
 /* Returns the sign bit of the double-precision floating-point value `a'.*/
@@ -48,25 +52,28 @@ bool le_fp64( uvec2 a, uvec2 b )
     uint bSign;
     uvec2 aFrac;
     uvec2 bFrac;
+    bool isaInf;
+    bool isbInf;
 
     aFrac = extractFloat64Frac( a );
     bFrac = extractFloat64Frac( b );
-    if (    (    ( extractFloat64Exp( a ) == 0x7FF )
-              && ( aFrac.x | aFrac.y ) )
-         || (    ( extractFloat64Exp( b ) == 0x7FF )
-              && ( bFrac.x | bFrac.y ) )
-       ) {
-        return 0;
+    isaInf = ( extractFloat64Exp( a ) == 0x7FFu ) &&
+        ( ( aFrac.x | aFrac.y ) != 0u );
+    isbInf = ( extractFloat64Exp( b ) == 0x7FFu ) &&
+       ( ( bFrac.x | bFrac.y ) != 0u );
+
+    if ( isaInf || isbInf )
+    {
+        return false;
     }
     aSign = extractFloat64Sign( a );
     bSign = extractFloat64Sign( b );
     if ( aSign != bSign ) {
-        return aSign
-            || (    ( ( ( ( a.x | b.x )<<1 ) ) | a.y | b.y )
-                 == 0 );
+        return ( aSign != 0u ) ||
+            ( ( ( ( ( a.x | b.x )<<1 ) ) | a.y | b.y ) == 0u );
     }
     return
-          aSign ? le64( b.x, b.y, a.x, a.y )
+          ( aSign != 0u ) ? le64( b.x, b.y, a.x, a.y )
         : le64( a.x, a.y, b.x, b.y );
 }
 
@@ -93,41 +100,41 @@ void main()
 # Try +0.0 and +0.0
 uniform uvec2 a        0x00000000 0x00000000
 uniform uvec2 b        0x00000000 0x00000000
-uniform bool expected  1
+uniform int expected   1
 draw rect -1 -1 2 2
 probe all rgba 0.0 1.0 0.0 1.0
 
 # Try 0.1 and 0.0
 uniform uvec2 a        0x3FB99999 0x9999999A
 uniform uvec2 b        0x00000000 0x00000000
-uniform bool expected  0
+uniform int expected   0
 draw rect -1 -1 2 2
 probe all rgba 0.0 1.0 0.0 1.0
 
 # Try 0.0 and 0.1
 uniform uvec2 a        0x00000000 0x00000000
 uniform uvec2 b        0x3FB99999 0x9999999A
-uniform bool expected  1
+uniform int expected   1
 draw rect -1 -1 2 2
 probe all rgba 0.0 1.0 0.0 1.0
 
 # Try 1 bit set and 0.0
 uniform uvec2 a        0x00000000 0x00000001
 uniform uvec2 b        0x00000000 0x00000000
-uniform bool expected  0
+uniform int expected   0
 draw rect -1 -1 2 2
 probe all rgba 0.0 1.0 0.0 1.0
 
 # Try 0.0 and 1 bit set
 uniform uvec2 a        0x00000000 0x00000000
 uniform uvec2 b        0x00000000 0x00000001
-uniform bool expected  1
+uniform int expected   1
 draw rect -1 -1 2 2
 probe all rgba 0.0 1.0 0.0 1.0
 
 # Try 1 bit set and 1 bit set
 uniform uvec2 a        0x00000000 0x00000001
 uniform uvec2 b        0x00000000 0x00000001
-uniform bool expected  1
+uniform int expected   1
 draw rect -1 -1 2 2
 probe all rgba 0.0 1.0 0.0 1.0
