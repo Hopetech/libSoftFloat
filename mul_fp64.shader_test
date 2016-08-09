@@ -13,15 +13,15 @@ void main()
 [fragment shader]
 /* Software IEEE floating-point rounding mode. */
 uint float_rounding_mode;
-const uint float_round_nearest_even = 0;
-const uint float_round_to_zero      = 1;
-const uint float_round_down         = 2;
-const uint float_round_up           = 3;
+const uint float_round_nearest_even = 0u;
+const uint float_round_to_zero      = 1u;
+const uint float_round_down         = 2u;
+const uint float_round_up           = 3u;
 
 /* Software IEEE floating-point underflow tininess-detection mode. */
 uint float_detect_tininess;
-const uint float_tininess_after_rounding  = 0;
-const uint float_tininess_before_rounding = 1;
+const uint float_tininess_after_rounding  = 0u;
+const uint float_tininess_before_rounding = 1u;
 
 /* Adds the 64-bit value formed by concatenating `a0' and `a1' to the 64-bit
  * value formed by concatenating `b0' and `b1'.  Addition is modulo 2^64, so
@@ -41,7 +41,7 @@ void add64(
 
     z1 = a1 + b1;
     z1Ptr = z1;
-    z0Ptr = a0 + b0 + ( z1 < a1 );
+    z0Ptr = a0 + b0 + uint ( z1 < a1 );
 }
 
 /* Shifts the 96-bit value formed by concatenating `a0', `a1', and `a2' right
@@ -62,13 +62,13 @@ void add64(
  * `z2Ptr'.)
  */
 void shift64ExtraRightJamming(
-     uint a0,
-     uint a1,
-     uint a2,
-     int count,
-     inout uint z0Ptr,
-     inout uint z1Ptr,
-     inout uint z2Ptr
+    uint a0,
+    uint a1,
+    uint a2,
+    int count,
+    inout uint z0Ptr,
+    inout uint z1Ptr,
+    inout uint z2Ptr
  )
 {
     uint z0;
@@ -99,13 +99,13 @@ void shift64ExtraRightJamming(
                     z1 = a0>>( count & 31 );
                 }
                 else {
-                    z2 = ( count == 64 ) ? a0 : ( a0 != 0 );
-                    z1 = 0;
+                    z2 = ( count == 64 ) ? a0 : uint ( a0 != 0u );
+                    z1 = 0u;
                 }
             }
-            z0 = 0;
+            z0 = 0u;
         }
-        z2 |= ( a2 != 0 );
+        z2 |= uint ( a2 != 0u );
     }
     z2Ptr = z2;
     z1Ptr = z1;
@@ -121,23 +121,23 @@ bool eq64( uint a0, uint a1, uint b0, uint b1 )
     return ( a0 == b0 ) && ( a1 == b1 );
 }
 
-/* Returns 1 if the 64-bit value formed by concatenating `a0' and `a1' is less
- * than the 64-bit value formed by concatenating `b0' and `b1'.  Otherwise,
- * returns 0.
+/* Packs the sign `zSign', the exponent `zExp', and the significand formed by
+ * the concatenation of `zFrac0' and `zFrac1' into a double-precision floating-
+ * point value, returning the result.  After being shifted into the proper
+ * positions, the three fields `zSign', `zExp', and `zFrac0' are simply added
+ * together to form the most significant 32 bits of the result.  This means
+ * that any integer portion of `zFrac0' will be added into the exponent.  Since
+ * a properly normalized significand will have an integer portion equal to 1,
+ * the `zExp' input should be 1 less than the desired result exponent whenever
+ * `zFrac0' and `zFrac1' concatenated form a complete, normalized significand.
  */
-bool lt64( uint a0, uint a1, uint b0, uint b1 )
+uvec2 packFloat64( uint zSign, uint zExp, uint zFrac0, uint zFrac1 )
 {
-    return ( a0 < b0 ) || ( ( a0 == b0 ) && ( a1 < b1 ) );
-}
+    uvec2 z;
 
-/* Packs the sign `aSign', exponent `aExp', and fraction `aFrac' into a
- * double-precision floating-point value, returning the result.  After being
- * shifted into the proper positions, the three fields are simply added
- * together to form the result.
- */
-uvec2 packFloat64( uint aSign, uint aExp, uvec2 aFrac )
-{
-    return uvec2( aSign + (aExp << 20) + aFrac.x, aFrac.y );
+    z.x = ( zSign<<31 ) + ( zExp<<20 ) + zFrac0;
+    z.y = zFrac1;
+    return z;
 }
 
 /* Takes an abstract floating-point value having sign `zSign', exponent `zExp',
@@ -170,67 +170,62 @@ uvec2 roundAndPackFloat64(
     uint roundingMode;
     uint roundNearestEven;
     uint increment;
-    uint isTiny;
 
     roundingMode = float_rounding_mode;
-    roundNearestEven = ( roundingMode == float_round_nearest_even );
-    increment = ( zFrac2 < 0 );
-    if ( ! roundNearestEven ) {
+    roundNearestEven = uint ( roundingMode == float_round_nearest_even );
+    increment = uint ( zFrac2 < 0u );
+    if ( roundNearestEven == 0u ) {
         if ( roundingMode == float_round_to_zero ) {
-            increment = 0;
+            increment = 0u;
         }
         else {
-            if ( zSign ) {
-                increment = ( roundingMode == float_round_down ) && zFrac2;
+            if ( zSign != 0u ) {
+                increment = uint ( ( roundingMode == float_round_down ) &&
+                        ( zFrac2 != 0u ) );
             }
             else {
-                increment = ( roundingMode == float_round_up ) && zFrac2;
+                increment = uint ( ( roundingMode == float_round_up ) &&
+                        ( zFrac2 != 0u ) );
             }
         }
     }
-    if ( 0x7FD <= zExp ) {
-        if (    ( 0x7FD < zExp )
-             || (    ( zExp == 0x7FD )
-                  && eq64( 0x001FFFFF, 0xFFFFFFFF, zFrac0, zFrac1 )
-                  && increment
-                )
-           ) {
-            if (    ( roundingMode == float_round_to_zero )
-                 || ( zSign && ( roundingMode == float_round_up ) )
-                 || ( ! zSign && ( roundingMode == float_round_down ) )
-               ) {
-                return packFloat64( zSign, 0x7FE, 0x000FFFFF, 0xFFFFFFFF );
+    if ( 0x7FDu <= zExp ) {
+        if ( ( 0x7FDu < zExp ) ||
+            ( ( zExp == 0x7FDu ) &&
+                eq64( 0x001FFFFFu, 0xFFFFFFFFu, zFrac0, zFrac1 ) &&
+                   ( increment != 0u ) ) ) {
+            if ( ( roundingMode == float_round_to_zero ) ||
+                ( ( zSign != 0u ) && ( roundingMode == float_round_up ) ) ||
+                    ( ( zSign == 0u ) && ( roundingMode == float_round_down ) ) ) {
+                return packFloat64( zSign, 0x7FEu, 0x000FFFFFu, 0xFFFFFFFFu );
             }
-            return packFloat64( zSign, 0x7FF, 0, 0 );
+            return packFloat64( zSign, 0x7FFu, 0u, 0u );
         }
-        if ( zExp < 0 ) {
-            isTiny =
-                   ( float_detect_tininess == float_tininess_before_rounding )
-                || ( zExp < -1 )
-                || ! increment
-                || lt64( zFrac0, zFrac1, 0x001FFFFF, 0xFFFFFFFF );
+        if ( zExp < 0u ) {
             shift64ExtraRightJamming(
-                zFrac0, zFrac1, zFrac2, - zExp, zFrac0, zFrac1, zFrac2 );
-            zExp = 0;
-            if ( roundNearestEven ) {
-                increment = ( zFrac2 < 0 );
+                zFrac0, zFrac1, zFrac2, int ( - zExp ), zFrac0, zFrac1, zFrac2 );
+            zExp = 0u;
+            if ( roundNearestEven != 0u ) {
+                increment = uint ( zFrac2 < 0u );
             }
             else {
-                if ( zSign ) {
-                    increment = ( roundingMode == float_round_down ) && zFrac2;
+                if ( zSign != 0u ) {
+                    increment = uint ( ( roundingMode == float_round_down ) &&
+                            ( zFrac2 != 0u ) );
                 }
                 else {
-                    increment = ( roundingMode == float_round_up ) && zFrac2;
+                    increment = uint ( ( roundingMode == float_round_up ) &&
+                            ( zFrac2 != 0u ) );
                 }
             }
         }
     }
-    if ( increment ) {
-        add64( zFrac0, zFrac1, 0, 1, zFrac0, zFrac1 );
-        zFrac1 &= ~ ( ( zFrac2 + zFrac2 == 0 ) & roundNearestEven );
+    if ( increment != 0u ) {
+        add64( zFrac0, zFrac1, 0u, 1u, zFrac0, zFrac1 );
+        zFrac1 &= ~ ( uint ( zFrac2 + zFrac2 == 0u ) & roundNearestEven );
     }
     else {
-        if ( ( zFrac0 | zFrac1 ) == 0 ) zExp = 0;
+        if ( ( zFrac0 | zFrac1 ) == 0u ) zExp = 0u;
     }
     return packFloat64( zSign, zExp, zFrac0, zFrac1 );
 }
@@ -259,10 +254,10 @@ void mul32To64( uint a, uint b, inout uint z0Ptr, inout uint z1Ptr )
     zMiddleB = aHigh * bLow;
     z0 = aHigh * bHigh;
     zMiddleA += zMiddleB;
-    z0 += ( ( zMiddleA < zMiddleB )<<16 ) + ( zMiddleA>>16 );
+    z0 += ( ( uint ( zMiddleA < zMiddleB ) )<<16 ) + ( zMiddleA>>16 );
     zMiddleA <<= 16;
     z1 += zMiddleA;
-    z0 += ( z1 < zMiddleA );
+    z0 += uint ( z1 < zMiddleA );
     z1Ptr = z1;
     z0Ptr = z0;
 }
@@ -292,12 +287,12 @@ void mul64To128(
 
     mul32To64( a1, b1, z2, z3 );
     mul32To64( a1, b0, z1, more2 );
-    add64( z1, more2, 0, z2, z1, z2 );
+    add64( z1, more2, 0u, z2, z1, z2 );
     mul32To64( a0, b0, z0, more1 );
-    add64( z0, more1, 0, z1, z0, z1 );
+    add64( z0, more1, 0u, z1, z0, z1 );
     mul32To64( a0, b1, more1, more2 );
-    add64( more1, more2, 0, z2, more1, z2 );
-    add64( z0, z1, 0, more1, z0, z1 );
+    add64( more1, more2, 0u, z2, more1, z2 );
+    add64( z0, z1, 0u, more1, z0, z1 );
     z3Ptr = z3;
     z2Ptr = z2;
     z1Ptr = z1;
@@ -317,7 +312,6 @@ void shortShift64Left(
     inout uint z1Ptr
  )
 {
-
     z1Ptr = a1<<count;
     z0Ptr =
         ( count == 0 ) ? a0 : ( a0<<count ) | ( a1>>( ( - count ) & 31 ) );
@@ -328,33 +322,33 @@ void shortShift64Left(
  */
 uint countLeadingZeros32( uint a )
 {
-    const uint countLeadingZerosHigh[] = {
-        8, 7, 6, 6, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4,
-        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-    };
+   const uint countLeadingZerosHigh[] = uint[](
+        8u, 7u, 6u, 6u, 5u, 5u, 5u, 5u, 4u, 4u, 4u, 4u, 4u, 4u, 4u, 4u,
+        3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u,
+        2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u,
+        2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u,
+        1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+        1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+        1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+        1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
+        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
+        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
+        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
+        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
+        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
+        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
+        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
+        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u
+    );
     uint shiftCount;
 
-    shiftCount = 0;
-    if ( a < 0x10000 ) {
-        shiftCount += 16;
+    shiftCount = 0u;
+    if ( ( a < 0x10000u ) == true ) {
+        shiftCount += 16u;
         a <<= 16;
     }
-    if ( a < 0x1000000 ) {
-        shiftCount += 8;
+    if ( ( a < 0x1000000u ) == true ) {
+        shiftCount += 8u;
         a <<= 8;
     }
     shiftCount += countLeadingZerosHigh[ a>>24 ];
@@ -377,24 +371,24 @@ void normalizeFloat64Subnormal(
      inout uint zFrac1Ptr
  )
 {
-    uint shiftCount;
+    int shiftCount;
 
-    if ( aFrac0 == 0 ) {
-        shiftCount = countLeadingZeros32( aFrac1 ) - 11;
+    if ( aFrac0 == 0u ) {
+        shiftCount = int ( countLeadingZeros32( aFrac1 ) ) - 11;
         if ( shiftCount < 0 ) {
             zFrac0Ptr = aFrac1>>( - shiftCount );
             zFrac1Ptr = aFrac1<<( shiftCount & 31 );
         }
         else {
             zFrac0Ptr = aFrac1<<shiftCount;
-            zFrac1Ptr = 0;
+            zFrac1Ptr = 0u;
         }
-        zExpPtr = - shiftCount - 31;
+        zExpPtr = uint ( - shiftCount - 31 );
     }
     else {
-        shiftCount = countLeadingZeros32( aFrac0 ) - 11;
+        shiftCount = int ( countLeadingZeros32( aFrac0 ) ) - 11;
         shortShift64Left( aFrac0, aFrac1, shiftCount, zFrac0Ptr, zFrac1Ptr );
-        zExpPtr = 1 - shiftCount;
+        zExpPtr = 1u - uint ( shiftCount );
     }
 }
 
@@ -403,8 +397,8 @@ void normalizeFloat64Subnormal(
  */
 bool float64_is_nan( uvec2 a )
 {
-    return ( 0xFFE00000 <= ( a.y<<1 ) )
-        && ( a.x || ( a.y & 0x000FFFFF ) );
+    return ( 0xFFE00000u <= ( a.y<<1 ) ) &&
+        ( ( a.x != 0u ) || ( ( a.y & 0x000FFFFFu ) != 0u ) );
 }
 
 /* Returns 1 if the double-precision floating-point value `a' is a signaling
@@ -412,8 +406,8 @@ bool float64_is_nan( uvec2 a )
  */
 bool float64_is_signaling_nan( uvec2 a )
 {
-    return ( ( ( a.y>>19 ) & 0xFFF ) == 0xFFE )
-        && ( a.x || ( a.y & 0x0007FFFF ) );
+    return ( ( ( a.y>>19 ) & 0xFFFu ) == 0xFFEu ) &&
+        ( ( a.x != 0u ) || ( ( a.y & 0x0007FFFFu ) != 0u ) );
 }
 
 /* Takes two double-precision floating-point values `a' and `b', one of which
@@ -431,10 +425,10 @@ uvec2 propagateFloat64NaN( uvec2 a, uvec2 b )
     aIsSignalingNaN = float64_is_signaling_nan( a );
     bIsNaN = float64_is_nan( b );
     bIsSignalingNaN = float64_is_signaling_nan( b );
-    a.y |= 0x00080000;
-    b.y |= 0x00080000;
+    a.y |= 0x00080000u;
+    b.y |= 0x00080000u;
     if ( aIsNaN ) {
-        return ( aIsSignalingNaN & bIsNaN ) ? b : a;
+        return ( aIsSignalingNaN && bIsNaN ) ? b : a;
     }
     else {
         return b;
@@ -444,13 +438,13 @@ uvec2 propagateFloat64NaN( uvec2 a, uvec2 b )
 /* Returns the fraction bits of the double-precision floating-point value `a'.*/
 uvec2 extractFloat64Frac( uvec2 a )
 {
-    return uvec2( a.x & 0x000FFFFF, a.y );
+    return uvec2( a.x & 0x000FFFFFu, a.y );
 }
 
 /* Returns the exponent bits of the double-precision floating-point value `a'.*/
 uint extractFloat64Exp( uvec2 a )
 {
-    return (a.x>>20) & 0x7FF;
+    return (a.x>>20) & 0x7FFu;
 }
 
 /* Returns the sign bit of the double-precision floating-point value `a'.*/
@@ -473,8 +467,10 @@ uvec2 mul_fp64( uvec2 a, uvec2 b )
     uint zExp;
     uvec2 aFrac;
     uvec2 bFrac;
-    uvec2 zFrac0;
-    uvec2 zFrac1;
+    uint zFrac0;
+    uint zFrac1;
+    uint zFrac2;
+    uint zFrac3;
 
     aFrac = extractFloat64Frac( a );
     aExp = extractFloat64Exp( a );
@@ -483,43 +479,43 @@ uvec2 mul_fp64( uvec2 a, uvec2 b )
     bExp = extractFloat64Exp( b );
     bSign = extractFloat64Sign( b );
     zSign = aSign ^ bSign;
-    if ( aExp == 0x7FF ) {
-        if (    ( aFrac.x | aFrac.y )
-             || ( ( bExp == 0x7FF ) && ( bFrac.x | bFrac.y ) ) ) {
+    if ( aExp == 0x7FFu ) {
+        if ( ( ( aFrac.x | aFrac.y ) != 0u ) ||
+            ( ( bExp == 0x7FFu ) && ( ( bFrac.x | bFrac.y ) != 0u ) ) ) {
             return propagateFloat64NaN( a, b );
         }
-        if ( ( bExp | bFrac.x | bFrac.y ) == 0 ) {
+        if ( ( bExp | bFrac.x | bFrac.y ) == 0u ) {
             return uvec2(0xFFFFFFFFu, 0xFFFFFFFFu);
         }
-        return packFloat64( zSign, 0x7FF, uvec2(0,0) );
+        return packFloat64( zSign, 0x7FFu, 0u, 0u );
     }
-    if ( bExp == 0x7FF ) {
-        if ( bFrac.x | bFrac.y ) return propagateFloat64NaN( a, b );
-        if ( ( aExp | aFrac.x | aFrac.y ) == 0 ) {
-            return uvec2(0xFFFFFFFFu, 0xFFFFFFFFu)
+    if ( bExp == 0x7FFu ) {
+        if ( ( bFrac.x | bFrac.y ) != 0u ) return propagateFloat64NaN( a, b );
+        if ( ( aExp | aFrac.x | aFrac.y ) == 0u ) {
+            return uvec2(0xFFFFFFFFu, 0xFFFFFFFFu);
         }
-        return packFloat64( zSign, 0x7FF, uvec2(0,0) );
+        return packFloat64( zSign, 0x7FFu, 0u, 0u );
     }
-    if ( aExp == 0 ) {
-        if ( ( aFrac.x | aFrac.y ) == 0 ) {
-            return packFloat64( zSign, 0, uvec2(0,0) );
+    if ( aExp == 0u ) {
+        if ( ( aFrac.x | aFrac.y ) == 0u ) {
+            return packFloat64( zSign, 0u, 0u, 0u );
         }
-        normalizeFloat64Subnormal( aFrac, aExp, aFrac );
+        normalizeFloat64Subnormal( aFrac.x, aFrac.y, aExp, aFrac.x, aFrac.y );
     }
-    if ( bExp == 0 ) {
-        if ( ( bFrac.x | bFrac.y ) == 0 ) {
-            return packFloat64( zSign, 0, uvec2(0,0) );
+    if ( bExp == 0u ) {
+        if ( ( bFrac.x | bFrac.y ) == 0u ) {
+            return packFloat64( zSign, 0u, 0u, 0u );
         }
-        normalizeFloat64Subnormal( bFrac, bExp, bFrac );
+        normalizeFloat64Subnormal( bFrac.x, bFrac.y, bExp, bFrac.x, bFrac.y );
     }
-    zExp = aExp + bExp - 0x400;
-    aFrac.x |= 0x00100000;
-    shortShift64Left( bFrac0, bFrac1, 12, bFrac0, bFrac1 );
+    zExp = aExp + bExp - 0x400u;
+    aFrac.x |= 0x00100000u;
+    shortShift64Left( bFrac.x, bFrac.y, 12, bFrac.x, bFrac.y );
     mul64To128(
-        aFrac0, aFrac1, bFrac0, bFrac1, zFrac0, zFrac1, zFrac2, zFrac3 );
-    add64( zFrac0, zFrac1, aFrac0, aFrac1, zFrac0, zFrac1 );
-    zFrac2 |= ( zFrac3 != 0 );
-    if ( 0x00200000 <= zFrac0 ) {
+        aFrac.x, aFrac.y, bFrac.x, bFrac.y, zFrac0, zFrac1, zFrac2, zFrac3 );
+    add64( zFrac0, zFrac1, aFrac.x, aFrac.y, zFrac0, zFrac1 );
+    zFrac2 |= uint ( zFrac3 != 0u );
+    if ( 0x00200000u <= zFrac0 ) {
         shift64ExtraRightJamming(
             zFrac0, zFrac1, zFrac2, 1, zFrac0, zFrac1, zFrac2 );
         ++zExp;
@@ -551,5 +547,26 @@ void main()
 uniform uvec2 a        0x00000000 0x00000000
 uniform uvec2 b        0x00000000 0x00000000
 uniform uvec2 expected 0x00000000 0x00000000
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
+
+# Try +0.0 and -0.0
+uniform uvec2 a        0x00000000 0x00000000
+uniform uvec2 b        0x80000000 0x00000000
+uniform uvec2 expected 0x80000000 0x00000000
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
+
+# Try +0.0 and +50.0
+uniform uvec2 a        0x00000000 0x00000000
+uniform uvec2 b        0x40490000 0x00000000
+uniform uvec2 expected 0x00000000 0x00000000
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
+
+# Try +1.0 and +50.0
+uniform uvec2 a        0x3FF00000 0x00000000
+uniform uvec2 b        0x40490000 0x00000000
+uniform uvec2 expected 0x40490000 0x00000000
 draw rect -1 -1 2 2
 probe all rgba 0.0 1.0 0.0 1.0
