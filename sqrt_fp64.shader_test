@@ -1,0 +1,692 @@
+# Sqrt of a double 
+# IEEE 754 compliant
+
+[require]
+GLSL >= 1.30
+
+[vertex shader]
+#version 130
+
+void main()
+{
+    gl_Position = gl_Vertex;
+}
+
+[fragment shader]
+#version 130
+
+/* Software IEEE floating-point rounding mode. */
+uint float_rounding_mode;
+const uint float_round_nearest_even = 0;
+const uint float_round_to_zero      = 1;
+const uint float_round_down         = 2;
+const uint float_round_up           = 3;
+
+/* Software IEEE floating-point underflow tininess-detection mode. */
+uint float_detect_tininess;
+const uint float_tininess_after_rounding  = 0;
+const uint float_tininess_before_rounding = 1;
+
+/* Adds the 64-bit value formed by concatenating `a0' and `a1' to the 64-bit
+ * value formed by concatenating `b0' and `b1'.  Addition is modulo 2^64, so
+ * any carry out is lost.  The result is broken into two 32-bit pieces which
+ * are stored at the locations pointed to by `z0Ptr' and `z1Ptr'.
+ */
+void add64(
+    uint a0,
+    uint a1,
+    uint b0,
+    uint b1,
+    inout uint z0Ptr,
+    inout uint z1Ptr
+ )
+{
+    uint z1;
+
+    z1 = a1 + b1;
+    z1Ptr = z1;
+    z0Ptr = a0 + b0 + ( z1 < a1 );
+}
+
+/* Subtracts the 64-bit value formed by concatenating `b0' and `b1' from the
+ * 64-bit value formed by concatenating `a0' and `a1'.  Subtraction is modulo
+ * 2^64, so any borrow out (carry out) is lost.  The result is broken into two
+ * 32-bit pieces which are stored at the locations pointed to by `z0Ptr' and
+ * `z1Ptr'.
+ */
+void sub64(
+    uint a0,
+    uint a1,
+    uint b0,
+    uint b1,
+    inout uint z0Ptr,
+    inout uint z1Ptr
+ )
+{
+    z1Ptr = a1 - b1;
+    z0Ptr = a0 - b0 - ( a1 < b1 );
+}
+
+/* Adds the 96-bit value formed by concatenating `a0', `a1', and `a2' to the
+ * 96-bit value formed by concatenating `b0', `b1', and `b2'.  Addition is
+ * modulo 2^96, so any carry out is lost.  The result is broken into three
+ * 32-bit pieces which are stored at the locations pointed to by `z0Ptr',
+ * `z1Ptr', and `z2Ptr'.
+ */
+void add96(
+     uint a0,
+     uint a1,
+     uint a2,
+     uint b0,
+     uint b1,
+     uint b2,
+     inout uint z0Ptr,
+     inout uint z1Ptr,
+     inout uint z2Ptr
+ )
+{
+    uint z0;
+    uint z1;
+    uint z2;
+    int carry0;
+    int carry1;
+
+    z2 = a2 + b2;
+    carry1 = ( z2 < a2 );
+    z1 = a1 + b1;
+    carry0 = ( z1 < a1 );
+    z0 = a0 + b0;
+    z1 += carry1;
+    z0 += ( z1 < carry1 );
+    z0 += carry0;
+    z2Ptr = z2;
+    z1Ptr = z1;
+    z0Ptr = z0;
+}
+
+/* Subtracts the 96-bit value formed by concatenating `b0', `b1', and `b2' from
+ * the 96-bit value formed by concatenating `a0', `a1', and `a2'.  Subtraction
+ * is modulo 2^96, so any borrow out (carry out) is lost.  The result is broken
+ * into three 32-bit pieces which are stored at the locations pointed to by
+ * `z0Ptr', `z1Ptr', and `z2Ptr'.
+ */
+void sub96(
+     uint a0,
+     uint a1,
+     uint a2,
+     uint b0,
+     uint b1,
+     uint b2,
+     inout uint z0Ptr,
+     inout uint z1Ptr,
+     inout uint z2Ptr
+ )
+{
+    int z0;
+    int z1;
+    int z2;
+    int borrow0;
+    int borrow1;
+
+    z2 = a2 - b2;
+    borrow1 = ( a2 < b2 );
+    z1 = a1 - b1;
+    borrow0 = ( a1 < b1 );
+    z0 = a0 - b0;
+    z0 -= ( z1 < borrow1 );
+    z1 -= borrow1;
+    z0 -= borrow0;
+    z2Ptr = z2;
+    z1Ptr = z1;
+    z0Ptr = z0;
+}
+
+/* Shifts the 96-bit value formed by concatenating `a0', `a1', and `a2' right
+ * by 32 _plus_ the number of bits given in `count'.  The shifted result is
+ * at most 64 nonzero bits; these are broken into two 32-bit pieces which are
+ * stored at the locations pointed to by `z0Ptr' and `z1Ptr'.  The bits shifted
+ * off form a third 32-bit result as follows:  The _last_ bit shifted off is
+ * the most-significant bit of the extra result, and the other 31 bits of the
+ * extra result are all zero if and only if _all_but_the_last_ bits shifted off
+ * were all zero.  This extra result is stored in the location pointed to by
+ * `z2Ptr'.  The value of `count' can be arbitrarily large.
+ *     (This routine makes more sense if `a0', `a1', and `a2' are considered
+ * to form a fixed-point value with binary point between `a1' and `a2'.  This
+ * fixed-point value is shifted right by the number of bits given in `count',
+ * and the integer part of the result is returned at the locations pointed to
+ * by `z0Ptr' and `z1Ptr'.  The fractional part of the result may be slightly
+ * corrupted as described above, and is returned at the location pointed to by
+ * `z2Ptr'.)
+ */
+void shift64ExtraRightJamming(
+     uint a0,
+     uint a1,
+     uint a2,
+     int count,
+     inout uint z0Ptr,
+     inout uint z1Ptr,
+     inout uint z2Ptr
+ )
+{
+    uint z0;
+    uint z1;
+    uint z2;
+    int negCount = ( - count ) & 31;
+
+    if ( count == 0 ) {
+        z2 = a2;
+        z1 = a1;
+        z0 = a0;
+    }
+    else {
+        if ( count < 32 ) {
+            z2 = a1<<negCount;
+            z1 = ( a0<<negCount ) | ( a1>>count );
+            z0 = a0>>count;
+        }
+        else {
+            if ( count == 32 ) {
+                z2 = a1;
+                z1 = a0;
+            }
+            else {
+                a2 |= a1;
+                if ( count < 64 ) {
+                    z2 = a0<<negCount;
+                    z1 = a0>>( count & 31 );
+                }
+                else {
+                    z2 = ( count == 64 ) ? a0 : ( a0 != 0 );
+                    z1 = 0;
+                }
+            }
+            z0 = 0;
+        }
+        z2 |= ( a2 != 0 );
+    }
+    z2Ptr = z2;
+    z1Ptr = z1;
+    z0Ptr = z0;
+}
+
+/* Returns 1 if the 64-bit value formed by concatenating `a0' and `a1' is
+ * equal to the 64-bit value formed by concatenating `b0' and `b1'.  Otherwise,
+ * returns 0.
+ */
+bool eq64( uint a0, uint a1, uint b0, uint b1 )
+{
+    return ( a0 == b0 ) && ( a1 == b1 );
+}
+
+/* Returns 1 if the 64-bit value formed by concatenating `a0' and `a1' is less
+ * than the 64-bit value formed by concatenating `b0' and `b1'.  Otherwise,
+ * returns 0.
+ */
+bool lt64( uint a0, uint a1, uint b0, uint b1 )
+{
+    return ( a0 < b0 ) || ( ( a0 == b0 ) && ( a1 < b1 ) );
+}
+
+/* Returns the number of leading 0 bits before the most-significant 1 bit of
+ * `a'.  If `a' is zero, 32 is returned.
+ */
+uint countLeadingZeros32( uint a )
+{
+    const uint countLeadingZerosHigh[] = {
+        8, 7, 6, 6, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4,
+        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    };
+    uint shiftCount;
+
+    shiftCount = 0;
+    if ( a < 0x10000 ) {
+        shiftCount += 16;
+        a <<= 16;
+    }
+    if ( a < 0x1000000 ) {
+        shiftCount += 8;
+        a <<= 8;
+    }
+    shiftCount += countLeadingZerosHigh[ a>>24 ];
+    return shiftCount;
+}
+
+/* Normalizes the subnormal double-precision floating-point value represented
+ * by the denormalized significand formed by the concatenation of `aFrac0' and
+ * `aFrac1'.  The normalized exponent is stored at the location pointed to by
+ * `zExpPtr'.  The most significant 21 bits of the normalized significand are
+ * stored at the location pointed to by `zFrac0Ptr', and the least significant
+ * 32 bits of the normalized significand are stored at the location pointed to
+ * by `zFrac1Ptr'.
+ */
+void normalizeFloat64Subnormal(
+     uint aFrac0,
+     uint aFrac1,
+     inout uint zExpPtr,
+     inout uint zFrac0Ptr,
+     inout uint zFrac1Ptr
+ )
+{
+    uint shiftCount;
+
+    if ( aFrac0 == 0 ) {
+        shiftCount = countLeadingZeros32( aFrac1 ) - 11;
+        if ( shiftCount < 0 ) {
+            zFrac0Ptr = aFrac1>>( - shiftCount );
+            zFrac1Ptr = aFrac1<<( shiftCount & 31 );
+        }
+        else {
+           zFrac0Ptr = aFrac1<<shiftCount;
+            zFrac1Ptr = 0;
+        }
+        zExpPtr = - shiftCount - 31;
+    }
+    else {
+        shiftCount = countLeadingZeros32( aFrac0 ) - 11;
+        shortShift64Left( aFrac0, aFrac1, shiftCount, zFrac0Ptr, zFrac1Ptr );
+        zExpPtr = 1 - shiftCount;
+    }
+}
+
+/* Packs the sign `zSign', the exponent `zExp', and the significand formed by
+ * the concatenation of `zFrac0' and `zFrac1' into a double-precision floating-
+ * point value, returning the result.  After being shifted into the proper
+ * positions, the three fields `zSign', `zExp', and `zFrac0' are simply added
+ * together to form the most significant 32 bits of the result.  This means
+ * that any integer portion of `zFrac0' will be added into the exponent.  Since
+ * a properly normalized significand will have an integer portion equal to 1,
+ * the `zExp' input should be 1 less than the desired result exponent whenever
+ * `zFrac0' and `zFrac1' concatenated form a complete, normalized significand.
+ */
+uvec2 packFloat64( uint zSign, uint zExp, uint zFrac0, uint zFrac1 )
+{
+    uvec2 z;
+
+    z.x = ( zSign<<31 ) + ( zExp<<20 ) + zFrac0;
+    z.y = zFrac1;
+    return z;
+}
+
+/* Takes an abstract floating-point value having sign `zSign', exponent `zExp',
+ * and extended significand formed by the concatenation of `zFrac0', `zFrac1',
+ * and `zFrac2', and returns the proper double-precision floating-point value
+ * corresponding to the abstract input.  Ordinarily, the abstract value is
+ * simply rounded and packed into the double-precision format, with the inexact
+ * exception raised if the abstract input cannot be represented exactly.
+ * However, if the abstract value is too large, the overflow and inexact
+ * exceptions are raised and an infinity or maximal finite value is returned.
+ * If the abstract value is too small, the input value is rounded to a
+ * subnormal number, and the underflow and inexact exceptions are raised if the
+ * abstract input cannot be represented exactly as a subnormal double-precision
+ * floating-point number.
+ *     The input significand must be normalized or smaller.  If the input
+ * significand is not normalized, `zExp' must be 0; in that case, the result
+ * returned is a subnormal number, and it must not require rounding.  In the
+ * usual case that the input significand is normalized, `zExp' must be 1 less
+ * than the "true" floating-point exponent.  The handling of underflow and
+ * overflow follows the IEEE Standard for Floating-Point Arithmetic.
+ */
+uvec2 roundAndPackFloat64(
+    uint zSign,
+    uint zExp,
+    uint zFrac0,
+    uint zFrac1,
+    uint zFrac2
+ )
+{
+    uint roundingMode;
+    uint roundNearestEven;
+    uint increment;
+    uint isTiny;
+
+    roundingMode = float_rounding_mode;
+    roundNearestEven = ( roundingMode == float_round_nearest_even );
+    increment = ( zFrac2 < 0 );
+    if ( ! roundNearestEven ) {
+        if ( roundingMode == float_round_to_zero ) {
+            increment = 0;
+        }
+        else {
+            if ( zSign ) {
+                increment = ( roundingMode == float_round_down ) && zFrac2;
+            }
+            else {
+                increment = ( roundingMode == float_round_up ) && zFrac2;
+            }
+        }
+    }
+    if ( 0x7FD <= zExp ) {
+        if (    ( 0x7FD < zExp )
+             || (    ( zExp == 0x7FD )
+                  && eq64( 0x001FFFFF, 0xFFFFFFFF, zFrac0, zFrac1 )
+                  && increment
+                )
+           ) {
+            if (    ( roundingMode == float_round_to_zero )
+                 || ( zSign && ( roundingMode == float_round_up ) )
+                 || ( ! zSign && ( roundingMode == float_round_down ) )
+               ) {
+                return packFloat64( zSign, 0x7FE, 0x000FFFFF, 0xFFFFFFFF );
+            }
+            return packFloat64( zSign, 0x7FF, 0, 0 );
+        }
+        if ( zExp < 0 ) {
+            isTiny =
+                   ( float_detect_tininess == float_tininess_before_rounding )
+                || ( zExp < -1 )
+                || ! increment
+                || lt64( zFrac0, zFrac1, 0x001FFFFF, 0xFFFFFFFF );
+            shift64ExtraRightJamming(
+                zFrac0, zFrac1, zFrac2, - zExp, zFrac0, zFrac1, zFrac2 );
+            zExp = 0;
+            if ( roundNearestEven ) {
+                increment = ( zFrac2 < 0 );
+            }
+            else {
+                if ( zSign ) {
+                    increment = ( roundingMode == float_round_down ) && zFrac2;
+                }
+                else {
+                    increment = ( roundingMode == float_round_up ) && zFrac2;
+                }
+            }
+        }
+    }
+    if ( increment ) {
+        add64( zFrac0, zFrac1, 0, 1, zFrac0, zFrac1 );
+        zFrac1 &= ~ ( ( zFrac2 + zFrac2 == 0 ) & roundNearestEven );
+    }
+    else {
+        if ( ( zFrac0 | zFrac1 ) == 0 ) zExp = 0;
+    }
+    return packFloat64( zSign, zExp, zFrac0, zFrac1 );
+}
+
+/* Shifts the 64-bit value formed by concatenating `a0' and `a1' left by the
+ * number of bits given in `count'.  Any bits shifted off are lost.  The value
+ * of `count' must be less than 32.  The result is broken into two 32-bit
+ * pieces which are stored at the locations pointed to by `z0Ptr' and `z1Ptr'.
+ */
+void shortShift64Left(
+    uint a0,
+    uint a1,
+    int count,
+    inout uint z0Ptr,
+    inout uint z1Ptr
+ )
+{
+    z1Ptr = a1<<count;
+    z0Ptr =
+        ( count == 0 ) ? a0 : ( a0<<count ) | ( a1>>( ( - count ) & 31 ) );
+}
+
+/* Multiplies `a' by `b' to obtain a 64-bit product.  The product is broken
+ * into two 32-bit pieces which are stored at the locations pointed to by
+ * `z0Ptr' and `z1Ptr'.
+ */
+void mul32To64( uint a, uint b, inout uint z0Ptr, inout uint z1Ptr )
+{
+    uint aHigh;
+    uint aLow;
+    uint bHigh;
+    uint bLow;
+    uint z0;
+    uint zMiddleA;
+    uint zMiddleB;
+    uint z1;
+
+    aLow = a;
+    aHigh = a>>16;
+    bLow = b;
+    bHigh = b>>16;
+    z1 = aLow * bLow;
+    zMiddleA = aLow * bHigh;
+    zMiddleB = aHigh * bLow;
+    z0 = aHigh * bHigh;
+    zMiddleA += zMiddleB;
+    z0 += ( ( zMiddleA < zMiddleB )<<16 ) + ( zMiddleA>>16 );
+    zMiddleA <<= 16;
+    z1 += zMiddleA;
+    z0 += ( z1 < zMiddleA );
+    z1Ptr = z1;
+    z0Ptr = z0;
+}
+
+/* Returns an approximation to the 32-bit integer quotient obtained by dividing
+ * `b' into the 64-bit value formed by concatenating `a0' and `a1'.  The
+ * divisor `b' must be at least 2^31.  If q is the exact quotient truncated
+ * toward zero, the approximation returned lies between q and q + 2 inclusive.
+ * If the exact quotient q is larger than 32 bits, the maximum positive 32-bit
+ * unsigned integer is returned.
+ */
+uint estimateDiv64To32( uint a0, uint a1, uint b )
+{
+    uint b0;
+    uint b1;
+    int rem0;
+    int rem1;
+    uint term0;
+    uint term1;
+    uint z;
+
+    if ( b <= a0 ) return 0xFFFFFFFF;
+    b0 = b>>16;
+    z = ( b0<<16 <= a0 ) ? 0xFFFF0000 : ( a0 / b0 )<<16;
+    mul32To64( b, z, term0, term1 );
+    sub64( a0, a1, term0, term1, rem0, rem1 );
+    while ( rem0 < 0 ) {
+        z -= 0x10000;
+        b1 = b<<16;
+        add64( rem0, rem1, b0, b1, rem0, rem1 );
+    }
+    rem0 = ( rem0<<16 ) | ( rem1>>16 );
+    z |= ( b0<<16 <= rem0 ) ? 0xFFFF : rem0 / b0;
+    return z;
+}
+
+/* Returns an approximation to the square root of the 32-bit significand given
+ * by `a'.  Considered as an integer, `a' must be at least 2^31.  If bit 0 of
+ * `aExp' (the least significant bit) is 1, the integer returned approximates
+ * 2^31*sqrt(`a'/2^31), where `a' is considered an integer.  If bit 0 of `aExp'
+ * is 0, the integer returned approximates 2^31*sqrt(`a'/2^30).  In either
+ * case, the approximation returned lies strictly within +/-2 of the exact
+ * value.
+ */
+uint estimateSqrt32( uint aExp, uint a )
+{
+    const uint sqrtOddAdjustments[] = {
+        0x0004, 0x0022, 0x005D, 0x00B1, 0x011D, 0x019F, 0x0236, 0x02E0,
+        0x039C, 0x0468, 0x0545, 0x0631, 0x072B, 0x0832, 0x0946, 0x0A67
+    };
+    const uint sqrtEvenAdjustments[] = {
+        0x0A2D, 0x08AF, 0x075A, 0x0629, 0x051A, 0x0429, 0x0356, 0x029E,
+        0x0200, 0x0179, 0x0109, 0x00AF, 0x0068, 0x0034, 0x0012, 0x0002
+    };
+    int index;
+    uint z;
+
+    index = ( a>>27 ) & 15;
+    if ( aExp & 1 ) {
+        z = 0x4000 + ( a>>17 ) - sqrtOddAdjustments[ index ];
+        z = ( ( a / z )<<14 ) + ( z<<15 );
+        a >>= 1;
+    }
+    else {
+        z = 0x8000 + ( a>>17 ) - sqrtEvenAdjustments[ index ];
+        z = a / z + z;
+        z = ( 0x20000 <= z ) ? 0xFFFF8000 : ( z<<15 );
+        if ( z <= a ) return ( a>>1 );
+    }
+    return ( ( estimateDiv64To32( a, 0, z ) )>>1 ) + ( z>>1 );
+}
+
+/* Returns 1 if the double-precision floating-point value `a' is a NaN;
+ * otherwise returns 0.
+ */
+bool float64_is_nan( uvec2 a )
+{
+    return ( 0xFFE00000 <= ( a.y<<1 ) ) 
+        && ( a.x || ( a.y & 0x000FFFFF ) );
+}
+
+/* Returns 1 if the double-precision floating-point value `a' is a signaling
+ * NaN; otherwise returns 0.
+ */
+bool float64_is_signaling_nan( uvec2 a )
+{
+    return ( ( ( a.y>>19 ) & 0xFFF ) == 0xFFE )
+        && ( a.x || ( a.y & 0x0007FFFF ) );
+}
+
+/* Takes two double-precision floating-point values `a' and `b', one of which
+ * is a NaN, and returns the appropriate NaN result.  If either `a' or `b' is
+ * a signaling NaN, the invalid exception is raised.
+ */
+uvec2 propagateFloat64NaN( uvec2 a, uvec2 b )
+{
+    bool aIsNaN;
+    bool aIsSignalingNaN;
+    bool bIsNaN;
+
+    aIsNaN = float64_is_nan( a );
+    aIsSignalingNaN = float64_is_signaling_nan( a );
+    bIsNaN = float64_is_nan( b );
+    a.y |= 0x00080000;
+    b.y |= 0x00080000;
+    if ( aIsNaN ) {
+        return ( aIsSignalingNaN & bIsNaN ) ? b : a;
+    }
+    else {
+        return b;
+    }
+}
+
+/* Returns the fraction bits of the double-precision floating-point value `a'.*/
+uvec2 extractFloat64Frac( uvec2 a )
+{
+    return uvec2( a.x & 0x000FFFFF, a.y );
+}
+
+/* Returns the exponent bits of the double-precision floating-point value `a'.*/
+uint extractFloat64Exp( uvec2 a )
+{
+    return (a.x>>20) & 0x7FF;
+}
+
+/* Returns the sign bit of the double-precision floating-point value `a'.*/
+uint extractFloat64Sign( uvec2 a )
+{
+    return (a.x>>31);
+}
+
+/* Returns the square root of the double-precision floating-point value `a'.
+ * The operation is performed according to the IEEE Standard for Floating-Point
+ * Arithmetic.
+ */
+uvec2 sqrt_fp64( uvec2 a )
+{
+    uint aFrac
+    uint aExp;
+    uint aSign;
+    uint zExp;
+    uint zFrac0;
+    uint zFrac1;
+    uint zFrac2;
+    uint doublezFrac0;
+    uint rem0;
+    uint rem1;
+    uint rem2;
+    uint rem3;
+    uint term0;
+    uint term1;
+    uint term2; 
+    uint term3;
+
+    aFrac = extractFloat64Frac( a );
+    aExp = extractFloat64Exp( a );
+    aSign = extractFloat64Sign( a );
+    if ( aExp == 0x7FF ) {
+        if ( aFrac.x | aFrac.y ) return propagateFloat64NaN( a, a );
+        if ( ! aSign ) return a;
+        return uvec2( 0xFFFFFFFFu, 0xFFFFFFFFu );
+    }
+    if ( aSign ) {
+        if ( ( aExp | aFrac.x | aFrac.y ) == 0 ) return a;
+        return uvec2( 0xFFFFFFFFu, 0xFFFFFFFFu );
+    }
+    if ( aExp == 0 ) {
+        if ( ( aFrac.x | aFrac.y ) == 0 ) return packFloat64( 0, 0, 0, 0 );
+        normalizeFloat64Subnormal( aFrac.x, aFrac.y, aExp, aFrac.x, aFrac.y );
+    }
+    zExp = ( ( aExp - 0x3FF )>>1 ) + 0x3FE;
+    aFrac.x |= 0x00100000;
+    shortShift64Left( aFrac.x, aFrac.y, 11, term0, term1 );
+    zFrac0 = ( estimateSqrt32( aExp, term0 )>>1 ) + 1;
+    if ( zFrac0 == 0 ) zFrac0 = 0x7FFFFFFF;
+    doublezFrac0 = zFrac0 + zFrac0;
+    shortShift64Left( aFrac.x, aFrac.y, 9 - ( aExp & 1 ), aFrac.x, aFrac.y );
+    mul32To64( zFrac0, zFrac0, term0, term1 );
+    sub64( aFrac.x, aFrac.y, term0, term1, rem0, rem1 );
+    while ( rem0 < 0 ) {
+        --zFrac0;
+        doublezFrac0 -= 2;
+        add64( rem0, rem1, 0, doublezFrac0 | 1, rem0, rem1 );
+    }
+    zFrac1 = estimateDiv64To32( rem1, 0, doublezFrac0 );
+    if ( ( zFrac1 & 0x1FF ) <= 5 ) {
+        if ( zFrac1 == 0 ) zFrac1 = 1;
+        mul32To64( doublezFrac0, zFrac1, term1, term2 );
+        sub64( rem1, 0, term1, term2, rem1, rem2 );
+        mul32To64( zFrac1, zFrac1, term2, term3 );
+        sub96( rem1, rem2, 0, 0, term2, term3, rem1, rem2, rem3 );
+        while ( rem1 < 0 ) {
+            --zFrac1;
+            shortShift64Left( 0, zFrac1, 1, term2, term3 );
+            term3 |= 1;
+            term2 |= doublezFrac0;
+            add96( rem1, rem2, rem3, 0, term2, term3, rem1, rem2, rem3 );
+        }
+        zFrac1 |= ( ( rem1 | rem2 | rem3 ) != 0 );
+    }
+    shift64ExtraRightJamming( zFrac0, zFrac1, 0, 10, zFrac0, zFrac1, zFrac2 );
+    return roundAndPackFloat64( 0, zExp, zFrac0, zFrac1, zFrac2 );
+}
+
+uniform uvec2 a;
+uniform uvec2 expected;
+
+void main()
+{
+    /* Generate green if the expected value is producted, red
+     * otherwise.
+     */
+    gl_FragColor = sqrt_fp64(a) == expected
+        ? vec4(0.0, 1.0, 0.0, 1.0)
+        : vec4(1.0, 0.0, 0.0, 1.0);
+}
+
+[test]
+# A bunch of tests to run.  The 'uniform' lines set the uniforms.  The
+# 'draw rect' line draws a rectangle that covers the whole window.
+# The 'probe all' line verifies that every pixel contains the expected
+# color.
+
+# Try +0.0
+uniform uvec2 a        0x00000000 0x00000000
+uniform uvec2 expected 0x00000000 0x00000000
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
