@@ -27,8 +27,8 @@ uint extractFloat64Exp( uvec2 a )
     return (a.x>>20) & 0x7FFu;
 }
 
-/* Returns 1 if the double-precision floating-point value `a' is equal to the
- * corresponding value `b', and 0 otherwise.  The comparison is performed
+/* Returns true if the double-precision floating-point value `a' is equal to the
+ * corresponding value `b', and false otherwise.  The comparison is performed
  * according to the IEEE Standard for Floating-Point Arithmetic.
  */
 bool eq_fp64( uvec2 a, uvec2 b )
