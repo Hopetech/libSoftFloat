@@ -184,8 +184,8 @@ draw rect -1 -1 2 2
 probe all rgba 0.0 1.0 0.0 1.0
 
 # Try -Inf
-uniform uint a         0x7F800000
-uniform uvec2 expected 0x7FF00000 0x00000000
+uniform uint a         0xFF800000
+uniform uvec2 expected 0xFFF00000 0x00000000
 draw rect -1 -1 2 2
 probe all rgba 0.0 1.0 0.0 1.0
 
