@@ -35,22 +35,22 @@ bool eq_fp64( uvec2 a, uvec2 b )
 {
     uvec2 aFrac;
     uvec2 bFrac;
-    bool isaInf;
-    bool isbInf;
+    bool isaNaN;
+    bool isbNaN;
 
     aFrac = extractFloat64Frac( a );
     bFrac = extractFloat64Frac( b );
-    isaInf = ( extractFloat64Exp( a ) == 0x7FFu ) &&
+    isaNaN = ( extractFloat64Exp( a ) == 0x7FFu ) &&
         ( ( aFrac.x | aFrac.y ) != 0u );
-    isbInf = ( extractFloat64Exp( b ) == 0x7FFu ) &&
+    isbNaN = ( extractFloat64Exp( b ) == 0x7FFu ) &&
        ( ( bFrac.x | bFrac.y ) != 0u );
 
-    if ( isaInf || isbInf )
+    if ( isaNaN || isbNaN )
     {
         return false;
     }
     return ( a.y == b.y ) &&
-        ( ( a.x == a.x ) || ( ( a.y == 0u ) && ( ( ( a.x | b.x )<<1) == 0u ) ) );
+        ( ( a.x == b.x ) || ( ( a.y == 0u ) && ( ( ( a.x | b.x )<<1) == 0u ) ) );
 }
 
 uniform uvec2 a;
@@ -83,7 +83,7 @@ probe all rgba 0.0 1.0 0.0 1.0
 # Try -0.0 and +0.0
 uniform uvec2 a        0x10000000 0x00000000
 uniform uvec2 b        0x00000000 0x00000000
-uniform int expected   1
+uniform int expected   0
 draw rect -1 -1 2 2
 probe all rgba 0.0 1.0 0.0 1.0
 
@@ -98,5 +98,33 @@ probe all rgba 0.0 1.0 0.0 1.0
 uniform uvec2 a        0x00000000 0x00000001
 uniform uvec2 b        0x00000000 0x00000000
 uniform int expected   0
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
+
+# Try +Inf and +Inf
+uniform uvec2 a       0x7FF00000 0x00000000
+uniform uvec2 b       0x7FF00000 0x00000000
+uniform int expected  1
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
+
+# Try +Inf and -Inf
+uniform uvec2 a       0x7FF00000 0x00000000
+uniform uvec2 b       0xFFF00000 0x00000000
+uniform int expected  0
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
+
+# Try 0 and NaN
+uniform uvec2 a      0x00000000 0x00000000
+uniform uvec2 b      0x7FF00000 0x00000001
+uniform int expected 0
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
+
+# Try +Inf and NaN
+uniform uvec2 a      0x7FF00000 0x00000000
+uniform uvec2 b      0x7FF00000 0x00000001
+uniform int expected 0
 draw rect -1 -1 2 2
 probe all rgba 0.0 1.0 0.0 1.0
