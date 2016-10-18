@@ -509,7 +509,7 @@ uvec2 mul_fp64( uvec2 a, uvec2 b )
         }
         normalizeFloat64Subnormal( bFrac.x, bFrac.y, bExp, bFrac.x, bFrac.y );
     }
-    zExp = aExp + bExp - 0x400u;
+    zExp = uint ( int ( aExp + bExp ) - 0x400 );
     aFrac.x |= 0x00100000u;
     shortShift64Left( bFrac.x, bFrac.y, 12, bFrac.x, bFrac.y );
     mul64To128(
