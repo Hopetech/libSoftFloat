@@ -16,19 +16,22 @@ void main()
 #version 130
 
 /* Returns the fraction bits of the double-precision floating-point value `a'.*/
-uvec2 extractFloat64Frac( uvec2 a )
+uvec2
+extractFloat64Frac( uvec2 a )
 {
     return uvec2( a.x & 0x000FFFFFu, a.y );
 }
 
 /* Returns the exponent bits of the double-precision floating-point value `a'.*/
-uint extractFloat64Exp( uvec2 a )
+uint
+extractFloat64Exp( uvec2 a )
 {
     return (a.x>>20) & 0x7FFu;
 }
 
 /* Returns the sign bit of the double-precision floating-point value `a'.*/
-uint extractFloat64Sign( uvec2 a )
+uint
+extractFloat64Sign( uvec2 a )
 {
     return (a.x>>31);
 }
@@ -37,7 +40,8 @@ uint extractFloat64Sign( uvec2 a )
  * than or equal to the 64-bit value formed by concatenating `b0' and `b1'.
  * Otherwise, returns false.
  */
-bool le64( uint a0, uint a1, uint b0, uint b1 )
+bool
+le64( uint a0, uint a1, uint b0, uint b1 )
 {
     return ( a0 < b0 ) || ( ( a0 == b0 ) && ( a1 <= b1 ) );
 }
@@ -46,7 +50,8 @@ bool le64( uint a0, uint a1, uint b0, uint b1 )
  * equal to the corresponding value `b', and false otherwise.  The comparison is
  * performed according to the IEEE Standard for Floating-Point Arithmetic.
  */
-bool le_fp64( uvec2 a, uvec2 b )
+bool
+le_fp64( uvec2 a, uvec2 b )
 {
     uint aSign;
     uint bSign;
@@ -62,10 +67,10 @@ bool le_fp64( uvec2 a, uvec2 b )
     isbNaN = ( extractFloat64Exp( b ) == 0x7FFu ) &&
        ( ( bFrac.x | bFrac.y ) != 0u );
 
-    if ( isaNaN || isbNaN )
-    {
+    if ( isaNaN || isbNaN ) {
         return false;
     }
+
     aSign = extractFloat64Sign( a );
     bSign = extractFloat64Sign( b );
     if ( aSign != bSign ) {

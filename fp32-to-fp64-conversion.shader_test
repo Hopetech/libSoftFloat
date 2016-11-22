@@ -25,7 +25,8 @@ void main()
  * the `zExp' input should be 1 less than the desired result exponent whenever
  * `zFrac0' and `zFrac1' concatenated form a complete, normalized significand.
  */
-uvec2 packFloat64( uint zSign, uint zExp, uint zFrac0, uint zFrac1 )
+uvec2
+packFloat64( uint zSign, uint zExp, uint zFrac0, uint zFrac1 )
 {
     uvec2 z;
 
@@ -37,7 +38,8 @@ uvec2 packFloat64( uint zSign, uint zExp, uint zFrac0, uint zFrac1 )
 /* Returns the number of leading 0 bits before the most-significant 1 bit of
  * `a'.  If `a' is zero, 32 is returned.
  */
-uint countLeadingZeros32( uint a )
+uint
+countLeadingZeros32( uint a )
 {
    const uint countLeadingZerosHigh[] = uint[](
         8u, 7u, 6u, 6u, 5u, 5u, 5u, 5u, 4u, 4u, 4u, 4u, 4u, 4u, 4u, 4u,
@@ -77,11 +79,10 @@ uint countLeadingZeros32( uint a )
  * significand are stored at the locations pointed to by `zExpPtr' and
  * `zFracPtr', respectively.
  */
-void normalizeFloat32Subnormal(
-    uint aFrac,
-    inout uint zExpPtr,
-    inout uint zFracPtr
- )
+void
+normalizeFloat32Subnormal( uint aFrac,
+                           inout uint zExpPtr,
+                           inout uint zFracPtr )
 {
     uint shiftCount;
 
@@ -91,19 +92,22 @@ void normalizeFloat32Subnormal(
 }
 
 /* Returns the fraction bits of the single-precision floating-point value `a'.*/
-uint extractFloat32Frac( uint a )
+uint
+extractFloat32Frac( uint a )
 {
     return a & 0x007FFFFFu;
 }
 
 /* Returns the exponent bits of the single-precision floating-point value `a'.*/
-uint extractFloat32Exp( uint a )
+uint
+extractFloat32Exp( uint a )
 {
     return (a>>23) & 0xFFu;
 }
 
 /* Returns the sign bit of the single-precision floating-point value `a'.*/
-uint extractFloat32Sign( uint a )
+uint
+extractFloat32Sign( uint a )
 {
     return a>>31;
 }
@@ -111,7 +115,8 @@ uint extractFloat32Sign( uint a )
 /* Returns the result of converting the single-precision floating-point value
  * `a' to the double-precision floating-point format.
  */
-uvec2 fp32_to_fp64( uint a )
+uvec2
+fp32_to_fp64( uint a )
 {
     uint aFrac;
     uint aExp;

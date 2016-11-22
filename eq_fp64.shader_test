@@ -16,13 +16,15 @@ void main()
 #version 130
 
 /* Returns the fraction bits of the double-precision floating-point value `a'.*/
-uvec2 extractFloat64Frac( uvec2 a )
+uvec2
+extractFloat64Frac( uvec2 a )
 {
     return uvec2( a.x & 0x000FFFFFu, a.y );
 }
 
 /* Returns the exponent bits of the double-precision floating-point value `a'.*/
-uint extractFloat64Exp( uvec2 a )
+uint
+extractFloat64Exp( uvec2 a )
 {
     return (a.x>>20) & 0x7FFu;
 }
@@ -31,7 +33,8 @@ uint extractFloat64Exp( uvec2 a )
  * corresponding value `b', and false otherwise.  The comparison is performed
  * according to the IEEE Standard for Floating-Point Arithmetic.
  */
-bool eq_fp64( uvec2 a, uvec2 b )
+bool
+eq_fp64( uvec2 a, uvec2 b )
 {
     uvec2 aFrac;
     uvec2 bFrac;
@@ -45,12 +48,12 @@ bool eq_fp64( uvec2 a, uvec2 b )
     isbNaN = ( extractFloat64Exp( b ) == 0x7FFu ) &&
        ( ( bFrac.x | bFrac.y ) != 0u );
 
-    if ( isaNaN || isbNaN )
-    {
+    if ( isaNaN || isbNaN ) {
         return false;
     }
     return ( a.y == b.y ) &&
-        ( ( a.x == b.x ) || ( ( a.y == 0u ) && ( ( ( a.x | b.x )<<1) == 0u ) ) );
+        ( ( a.x == b.x ) ||
+            ( ( a.y == 0u ) && ( ( ( a.x | b.x )<<1) == 0u ) ) );
 }
 
 uniform uvec2 a;

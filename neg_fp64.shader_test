@@ -18,7 +18,8 @@ void main()
 /* Negate value of a Float64 :
  * Toggle the sign bit
  */
-uvec2 neg_fp64(uvec2 a)
+uvec2
+neg_fp64( uvec2 a )
 {
     a.x ^= (1u<<31);
     return a;

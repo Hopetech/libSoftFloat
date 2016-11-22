@@ -22,11 +22,6 @@ const uint float_round_to_zero      = 1u;
 const uint float_round_down         = 2u;
 const uint float_round_up           = 3u;
 
-/* Software IEEE floating-point underflow tininess-detection mode. */
-uint float_detect_tininess;
-const uint float_tininess_after_rounding  = 0u;
-const uint float_tininess_before_rounding = 1u;
-
 /* Packs the sign `zSign', exponent `zExp', and significand `zFrac' into a
  * single-precision floating-point value, returning the result.  After being
  * shifted into the proper positions, the three fields are simply added
@@ -36,7 +31,8 @@ const uint float_tininess_before_rounding = 1u;
  * than the desired result exponent whenever `zFrac' is a complete, normalized
  * significand.
  */
-uint packFloat32( uint zSign, uint zExp, uint zFrac )
+uint
+packFloat32( uint zSign, uint zExp, uint zFrac )
 {
     return ( zSign<<31 ) + ( zExp<<23 ) + zFrac;
 }
@@ -48,17 +44,16 @@ uint packFloat32( uint zSign, uint zExp, uint zFrac )
  * result will be either 0 or 1, depending on whether `a' is zero or nonzero.
  * The result is stored in the location pointed to by `zPtr'.
  */
-void shift32RightJamming( uint a, int count, inout uint zPtr )
+void
+shift32RightJamming( uint a, int count, inout uint zPtr )
 {
     uint z;
 
     if( count == 0 ) {
         z = a;
-    }
-    else if( count < 32 ) {
+    } else if( count < 32 ) {
         z = ( a>>count ) | uint ( ( a<<( ( - count ) & 31 ) ) != 0u );
-    }
-    else {
+    } else {
         z = uint ( a != 0u );
     }
     zPtr = z;
@@ -73,12 +68,11 @@ void shift32RightJamming( uint a, int count, inout uint zPtr )
  * nonzero.  The result is broken into two 32-bit pieces which are stored at
  * the locations pointed to by `z0Ptr' and `z1Ptr'.
  */
-void shift64RightJamming(
-    uvec2 a,
-    int count,
-    inout uint z0Ptr,
-    inout uint z1Ptr
- )
+void
+shift64RightJamming( uvec2 a,
+                     int count,
+                     inout uint z0Ptr,
+                     inout uint z1Ptr )
 {
     uint z0;
     uint z1;
@@ -87,19 +81,18 @@ void shift64RightJamming(
     if ( count == 0 ) {
         z1 = a.y;
         z0 = a.x;
-    }
-    else if ( count < 32 ) {
-        z1 = ( a.x<<negCount ) | ( a.y>>count ) | uint ( ( a.y<<negCount ) != 0u );
+    } else if ( count < 32 ) {
+        z1 = ( a.x<<negCount ) |
+                ( a.y>>count ) |
+                uint ( ( a.y<<negCount ) != 0u );
         z0 = a.x>>count;
-    }
-    else {
+    } else {
         if ( count == 32 ) {
             z1 = a.x | uint ( a.y != 0u );
-        }
-        else if ( count < 64 ) {
-            z1 = ( a.x>>( count & 31 ) ) | uint ( ( ( a.x<<negCount ) | a.y ) != 0u );
-        }
-        else {
+        } else if ( count < 64 ) {
+            z1 = ( a.x>>( count & 31 ) ) |
+                uint ( ( ( a.x<<negCount ) | a.y ) != 0u );
+        } else {
             z1 = uint ( ( a.x | a.y ) != 0u );
         }
         z0 = 0u;
@@ -128,7 +121,8 @@ void shift64RightJamming(
  * The handling of underflow and overflow follows the IEEE Standard for
  * Floating-Point Arithmetic.
  */
-uint roundAndPackFloat32( uint zSign, uint zExp, uint zFrac )
+uint
+roundAndPackFloat32( uint zSign, uint zExp, uint zFrac )
 {
     uint roundingMode;
     uint roundNearestEven;
@@ -141,14 +135,16 @@ uint roundAndPackFloat32( uint zSign, uint zExp, uint zFrac )
     if ( roundNearestEven == 0u ) {
         if ( roundingMode == float_round_to_zero ) {
             roundIncrement = 0u;
-        }
-        else {
+        } else {
             roundIncrement = 0x7Fu;
             if ( zSign != 0u ) {
-                if ( roundingMode == float_round_up ) roundIncrement = 0u;
-            }
-            else {
-                if ( roundingMode == float_round_down ) roundIncrement = 0u;
+                if ( roundingMode == float_round_up ) {
+                      roundIncrement = 0u;
+                }
+            } else {
+                if ( roundingMode == float_round_down ) {
+                      roundIncrement = 0u;
+                }
             }
         }
     }
@@ -156,35 +152,41 @@ uint roundAndPackFloat32( uint zSign, uint zExp, uint zFrac )
     if ( 0xFDu <= zExp ) {
         if ( ( 0xFDu < zExp ) ||
             ( ( zExp == 0xFDu ) && ( ( zFrac + roundIncrement ) < 0u ) ) ) {
-            return packFloat32( zSign, 0xFFu, 0u ) - uint ( roundIncrement == 0u );
+            return packFloat32(
+                zSign, 0xFFu, 0u ) - uint ( roundIncrement == 0u );
         }
         if ( zExp < 0u ) {
-            shift32RightJamming( zFrac, int (- zExp), zFrac );
+            shift32RightJamming( zFrac, - int (zExp), zFrac );
             zExp = 0u;
             roundBits = zFrac & 0x7Fu;
         }
     }
     zFrac = ( zFrac + roundIncrement )>>7;
     zFrac &= ~ ( uint ( ( roundBits ^ 0x40u ) == 0u ) & roundNearestEven );
-    if ( zFrac == 0u ) zExp = 0u;
+    if ( zFrac == 0u ) {
+        zExp = 0u;
+    }
     return packFloat32( zSign, zExp, zFrac );
 }
 
 
 /* Returns the fraction bits of the double-precision floating-point value `a'.*/
-uvec2 extractFloat64Frac( uvec2 a )
+uvec2
+extractFloat64Frac( uvec2 a )
 {
     return uvec2( a.x & 0x000FFFFFu, a.y );
 }
 
 /* Returns the exponent bits of the double-precision floating-point value `a'.*/
-uint extractFloat64Exp( uvec2 a )
+uint
+extractFloat64Exp( uvec2 a )
 {
     return (a.x>>20) & 0x7FFu;
 }
 
 /* Returns the sign bit of the double-precision floating-point value `a'.*/
-uint extractFloat64Sign( uvec2 a )
+uint
+extractFloat64Sign( uvec2 a )
 {
     return (a.x>>31);
 }
@@ -193,7 +195,8 @@ uint extractFloat64Sign( uvec2 a )
  * `a' to the single-precision floating-point format.  The conversion is
  * performed according to the IEEE Standard for Floating-Point Arithmetic.
  */
-uint fp64_to_fp32( uvec2 a )
+uint
+fp64_to_fp32( uvec2 a )
 {
     uint aSign;
     uint aExp;
@@ -212,7 +215,9 @@ uint fp64_to_fp32( uvec2 a )
         return packFloat32( aSign, 0xFFu, 0u );
     }
     shift64RightJamming( aFrac, 22, allZero, zFrac );
-    if ( aExp != 0u ) zFrac |= 0x40000000u;
+    if ( aExp != 0u ) {
+        zFrac |= 0x40000000u;
+    }
     return roundAndPackFloat32( aSign, aExp - 0x381u, zFrac );
 }
 
@@ -235,18 +240,6 @@ void main()
 # The 'probe all' line verifies that every pixel contains the expected
 # color.
 
-# Try +0.0
-uniform uvec2 a       0x00000000 0x00000000
-uniform uint expected 0x00000000
-draw rect -1 -1 2 2
-probe all rgba 0.0 1.0 0.0 1.0
-
-# Try -0.0
-uniform uvec2 a       0x80000000 0x00000000
-uniform uint expected 0x80000000
-draw rect -1 -1 2 2
-probe all rgba 0.0 1.0 0.0 1.0
-
 # Try +Inf
 uniform uvec2 a       0x7FF00000 0x00000000
 uniform uint expected 0x7F800000
@@ -262,5 +255,23 @@ probe all rgba 0.0 1.0 0.0 1.0
 # Try 50
 uniform uvec2 a       0x40490000 0x00000000
 uniform uint expected 0x42480000
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
+
+# Try -50
+uniform uvec2 a       0xC0490000 0x00000000
+uniform uint expected 0xC2480000
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
+
+# Try 1
+uniform uvec2 a       0x3FF00000 0x00000000
+uniform uint expected 0x3F800000
+draw rect -1 -1 2 2
+probe all rgba 0.0 1.0 0.0 1.0
+
+# Try 0.4
+uniform uvec2 a       0x3FD99999 0x9999999A
+uniform uint expected 0x3ECCCCCD
 draw rect -1 -1 2 2
 probe all rgba 0.0 1.0 0.0 1.0
