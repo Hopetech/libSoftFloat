@@ -30,4 +30,4 @@ Elie Tournier
 
 tournier.elie@gmail.com
 
-https://github.com/Hoptech
+https://github.com/Hopetech
