@@ -295,36 +295,15 @@ void shortShift64Left( uint a0, uint a1,
 uint
 countLeadingZeros32( uint a )
 {
-   const uint countLeadingZerosHigh[] = uint[](
-        8u, 7u, 6u, 6u, 5u, 5u, 5u, 5u, 4u, 4u, 4u, 4u, 4u, 4u, 4u, 4u,
-        3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u, 3u,
-        2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u,
-        2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u, 2u,
-        1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
-        1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
-        1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
-        1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u,
-        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
-        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
-        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
-        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
-        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
-        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
-        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
-        0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u
-    );
-    uint shiftCount;
+    if ( a == 0u )
+        return 32u;
 
-    shiftCount = 0u;
-    if ( ( a < 0x10000u ) == true ) {
-        shiftCount += 16u;
-        a <<= 16;
-    }
-    if ( ( a < 0x1000000u ) == true ) {
-        shiftCount += 8u;
-        a <<= 8;
-    }
-    shiftCount += countLeadingZerosHigh[ a>>24 ];
+    uint shiftCount = 0u;
+    if ( ( a & 0xFFFF0000u ) == 0u ) { shiftCount += 16u; a <<= 16; }
+    if ( ( a & 0xFF000000u ) == 0u ) { shiftCount += 8u; a <<= 8; }
+    if ( ( a & 0xF0000000u ) == 0u ) { shiftCount += 4u; a <<= 4; }
+    if ( ( a & 0xC0000000u ) == 0u ) { shiftCount += 2u; a <<= 2; }
+    if ( ( a & 0x80000000u ) == 0u ) { shiftCount += 1u; }
     return shiftCount;
 }
 
