@@ -484,7 +484,7 @@ addFloat64Fracs( uvec2 a, uvec2 b, uint zSign )
     add64( aFrac.x, aFrac.y, bFrac.x, bFrac.y, zFrac0, zFrac1 );
     --zExp;
     if ( zFrac0 < 0x00200000u ) {
-        return roundAndPackFloat64( zSign, zExp, zFrac0, zFrac2, zFrac2 );
+        return roundAndPackFloat64( zSign, zExp, zFrac0, zFrac1, zFrac2 );
     }
     ++zExp;
     shift64ExtraRightJamming(
@@ -591,11 +591,11 @@ subFloat64Fracs( uvec2 a, uvec2 b, uint zSign )
             zSign, zExp - 10u, zFrac0, zFrac1 );
     }
     if ( aFrac.y < bFrac.y ) {
-    sub64( bFrac.x, bFrac.y, aFrac.x, aFrac.y, zFrac0, zFrac1 );
-    zExp = bExp;
-    zSign ^= 1u;
-    --zExp;
-    return normalizeRoundAndPackFloat64( zSign, zExp - 10u, zFrac0, zFrac1 );
+        sub64( bFrac.x, bFrac.y, aFrac.x, aFrac.y, zFrac0, zFrac1 );
+        zExp = bExp;
+        zSign ^= 1u;
+        --zExp;
+        return normalizeRoundAndPackFloat64( zSign, zExp - 10u, zFrac0, zFrac1 );
     }
     return packFloat64(
         uint ( float_rounding_mode == float_round_down ), 0u, 0u, 0u );
